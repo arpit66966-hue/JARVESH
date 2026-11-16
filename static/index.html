@@ -26,7 +26,10 @@ display:flex;justify-content:space-between;align-items:center
 }
 .brand{font-size:25px;font-weight:800;color:#36b7ff;letter-spacing:2px}
 .muted{color:#9ab0c9;font-size:12px}
-.chat{padding:20px;overflow-y:auto;flex:1;min-height:0;scroll-behavior:smooth}
+.chat{
+padding:20px;overflow-y:auto;flex:1;min-height:0;
+scroll-behavior:smooth
+}
 .msg{
 padding:12px 15px;border-radius:13px;margin:0 0 13px;
 max-width:85%;white-space:pre-wrap;line-height:1.45;
@@ -73,11 +76,59 @@ width:100%;min-height:45px;background:#101b2b;color:white;
 border:1px solid #35506f;border-radius:8px;padding:10px;
 margin:8px 0;overflow-wrap:anywhere
 }
+
+/* FULL SCREEN CAMERA */
+.camera-fullscreen{
+display:none;position:fixed;inset:0;z-index:99999;
+background:#050b14;padding:18px;
+grid-template-columns:minmax(0,1fr) 145px;gap:15px
+}
+.camera-fullscreen.active{display:grid}
+.camera-view{
+min-width:0;display:flex;flex-direction:column;
+align-items:center;justify-content:center
+}
+.camera-title{
+color:#36b7ff;font-size:21px;font-weight:bold;
+margin-bottom:12px;text-align:center
+}
+.live-result{
+width:100%;padding:13px;background:#14243a;
+border:1px solid #29415e;border-radius:10px;
+color:#36b7ff;font-size:21px;font-weight:bold;
+margin-bottom:12px;overflow-wrap:anywhere
+}
+.live-description{
+font-size:13px;color:#c2d5e9;margin-top:5px
+}
+.camera-view video{
+width:100%;height:calc(100vh - 145px);
+object-fit:contain;background:#000;border-radius:12px
+}
+.camera-controls{
+display:flex;flex-direction:column;
+justify-content:center;gap:15px
+}
+.camera-controls button{padding:15px 7px;font-size:14px}
+.camera-controls .muted{line-height:1.5}
+.hidden-source{
+position:fixed;width:1px;height:1px;
+opacity:0;pointer-events:none;left:-10px;top:0
+}
+
 @media(max-width:700px){
 .app{grid-template-columns:1fr;height:96vh}
 .side{display:none}
 .top{padding:12px}
 .bar{padding:8px}
+.camera-fullscreen{
+grid-template-columns:minmax(0,1fr) 90px;
+padding:8px;gap:7px
+}
+.camera-title{font-size:16px}
+.live-result{font-size:16px;padding:9px}
+.camera-view video{height:calc(100vh - 145px)}
+.camera-controls button{font-size:11px;padding:12px 4px}
 }
 </style>
 
@@ -88,6 +139,29 @@ margin:8px 0;overflow-wrap:anywhere
 </head>
 
 <body>
+
+<!-- FULL SCREEN CAMERA -->
+<div class="camera-fullscreen" id="cameraFullscreen">
+    <div class="camera-view">
+        <div class="camera-title" id="cameraTitle">JARVESH AI CAMERA</div>
+
+        <div class="live-result">
+            <div id="liveGestureText">Waiting for detection...</div>
+            <div class="live-description" id="liveDescription">
+                Camera starting...
+            </div>
+        </div>
+
+        <video id="fullCameraVideo" autoplay playsinline muted></video>
+    </div>
+
+    <div class="camera-controls">
+        <button class="btn red" onclick="stopActiveCamera()">
+            STOP CAMERA
+        </button>
+        <div class="muted" id="fullCameraStatus">Camera starting...</div>
+    </div>
+</div>
 
 <div class="app">
 <main>
@@ -118,24 +192,16 @@ Namaste! Main JARVESH hoon. Help likhkar commands dekhiye.
 <div class="panel" id="bodyPanel">
 <strong>JARVESH BODY LANGUAGE AI</strong>
 <div class="panelStatus" id="bodyStatus">Camera waiting...</div>
-<video id="bodyVideo" autoplay playsinline muted></video>
+<video id="bodyVideo" class="hidden-source" autoplay playsinline muted></video>
 <canvas id="bodyCanvas"></canvas>
-<br>
-<button class="btn red" onclick="stopBody()">STOP BODY CAMERA</button>
 </div>
 
 <!-- HAND PANEL -->
 <div class="panel" id="handPanel">
 <strong>JARVESH HAND GESTURE + SIGN AI</strong>
-
-<div class="modeButtons">
-<button class="btn" onclick="startHand('basic')">BASIC GESTURE</button>
-<button class="btn green" onclick="startHand('sign')">SIGN LANGUAGE</button>
-<button class="btn red" onclick="stopHand()">STOP CAMERA</button>
-</div>
-
 <div class="panelStatus" id="handStatus">Mode select karein.</div>
-<video id="handVideo" autoplay playsinline muted></video>
+
+<video id="handVideo" class="hidden-source" autoplay playsinline muted></video>
 <canvas id="handCanvas"></canvas>
 
 <strong>Detected text:</strong>
@@ -206,12 +272,25 @@ document.getElementById('form').requestSubmit();
 document.getElementById('commands').appendChild(b);
 });
 
-// AUTO SCROLL
+// CHAT AUTO SCROLL
 function scrollChat(){
 requestAnimationFrame(()=>{
-chat.scrollTop=chat.scrollHeight;
+chat.scrollTo({
+top:chat.scrollHeight,
+behavior:'smooth'
+});
 });
 }
+
+const chatObserver=new MutationObserver(()=>{
+scrollChat();
+});
+
+chatObserver.observe(chat,{
+childList:true,
+subtree:true,
+characterData:true
+});
 
 function add(who,msg){
 let d=document.createElement('div');
@@ -253,12 +332,64 @@ speechSynthesis.speak(u);
 }
 
 // ===================================
+// FULL SCREEN CAMERA CONTROLS
+// ===================================
+
+let activeCamera=null;
+
+function openFullCamera(videoId,title){
+const source=document.getElementById(videoId);
+const display=document.getElementById('fullCameraVideo');
+
+document.getElementById('cameraTitle').textContent=title;
+document.getElementById('cameraFullscreen').classList.add('active');
+
+display.srcObject=source.srcObject;
+display.play().catch(console.error);
+
+activeCamera=videoId;
+
+document.getElementById('fullCameraStatus').textContent='● CAMERA ON';
+}
+
+function updateLiveCamera(text,description){
+document.getElementById('liveGestureText').textContent=text;
+document.getElementById('liveDescription').textContent=description||'';
+}
+
+function closeFullCamera(){
+const overlay=document.getElementById('cameraFullscreen');
+const display=document.getElementById('fullCameraVideo');
+
+overlay.classList.remove('active');
+display.pause();
+display.srcObject=null;
+
+activeCamera=null;
+}
+
+function stopActiveCamera(){
+if(activeCamera==='bodyVideo'){
+stopBody();
+add('JARVESH','Body camera band kar diya.');
+}
+else if(activeCamera==='handVideo'){
+stopHand();
+add('JARVESH','Hand AI camera band kar diya.');
+}
+else{
+closeFullCamera();
+}
+}
+
+// ===================================
 // BODY LANGUAGE AI
 // ===================================
 
 let bodyCamera=null;
 let poseModel=null;
 let bodyRunning=false;
+let bodyStream=null;
 
 async function startBody(){
 
@@ -271,11 +402,11 @@ try{
 
 const video=document.getElementById('bodyVideo');
 
-const stream=await navigator.mediaDevices.getUserMedia({
+bodyStream=await navigator.mediaDevices.getUserMedia({
 video:true,audio:false
 });
 
-video.srcObject=stream;
+video.srcObject=bodyStream;
 await video.play();
 
 bodyRunning=true;
@@ -303,41 +434,52 @@ canvas.width=video.videoWidth;
 canvas.height=video.videoHeight;
 
 ctx.clearRect(0,0,canvas.width,canvas.height);
-ctx.drawImage(results.image,0,0,canvas.width,canvas.height);
 
 if(results.poseLandmarks){
 
-drawConnectors(ctx,results.poseLandmarks,POSE_CONNECTIONS,{
-color:'#00e5ff',lineWidth:4
-});
-
-drawLandmarks(ctx,results.poseLandmarks,{
-color:'#ffcc00',lineWidth:2,radius:4
-});
-
 document.getElementById('bodyStatus').textContent='Body detected - landmarks visible';
 
+updateLiveCamera(
+'BODY DETECTED',
+'Body landmarks successfully detected.'
+);
+
 }else{
+
 document.getElementById('bodyStatus').textContent='Body camera mein nahi mili.';
+
+updateLiveCamera(
+'BODY NOT DETECTED',
+'Camera ke saamne body position karein.'
+);
 }
 
 });
 
 bodyCamera=new Camera(video,{
 onFrame:async()=>{
-if(bodyRunning)await poseModel.send({image:video});
+if(bodyRunning&&poseModel){
+await poseModel.send({image:video});
+}
 },
-width:640,height:480
+width:640,
+height:480
 });
 
 bodyCamera.start();
 
-add('JARVESH','Body Language AI start ho gaya hai.');
+openFullCamera('bodyVideo','JARVESH BODY LANGUAGE AI');
+
+add('JARVESH','Body detection camera start ho gaya hai.');
+say('Body detection camera start ho gaya hai.');
 
 }catch(error){
+
 console.error(error);
 stopBody();
+
 add('JARVESH','Camera open nahi hua. Permission check karein.');
+
 }
 
 }
@@ -356,6 +498,11 @@ poseModel.close();
 poseModel=null;
 }
 
+if(bodyStream){
+bodyStream.getTracks().forEach(t=>t.stop());
+bodyStream=null;
+}
+
 let video=document.getElementById('bodyVideo');
 
 if(video.srcObject){
@@ -364,6 +511,7 @@ video.srcObject=null;
 }
 
 document.getElementById('bodyPanel').style.display='none';
+closeFullCamera();
 }
 
 // ===================================
@@ -377,6 +525,7 @@ let handMode='basic';
 let lastHandLabel='';
 let lastHandTime=0;
 let signText='';
+let handStream=null;
 
 function updateSignOutput(){
 document.getElementById('signOutput').textContent=
@@ -449,11 +598,12 @@ try{
 
 const video=document.getElementById('handVideo');
 
-const stream=await navigator.mediaDevices.getUserMedia({
-video:{facingMode:'user'},audio:false
+handStream=await navigator.mediaDevices.getUserMedia({
+video:{facingMode:'user'},
+audio:false
 });
 
-video.srcObject=stream;
+video.srcObject=handStream;
 await video.play();
 
 handRunning=true;
@@ -473,22 +623,35 @@ handModel.onResults(onHandResults);
 
 handCamera=new Camera(video,{
 onFrame:async()=>{
-if(handRunning)await handModel.send({image:video});
+if(handRunning&&handModel){
+await handModel.send({image:video});
+}
 },
-width:640,height:480
+width:640,
+height:480
 });
 
 handCamera.start();
 
+openFullCamera(
+'handVideo',
+mode==='basic'?'JARVESH HAND GESTURE AI':'JARVESH SIGN LANGUAGE AI'
+);
+
+updateLiveCamera('WAITING FOR HAND','Apna hand camera ke saamne laayein.');
+
 document.getElementById('handStatus').textContent=
 mode==='basic'?'Basic Gesture Mode ON':'Sign Language Mode ON';
 
-add('JARVESH',mode==='basic'?'Basic Hand Gesture AI start ho gaya.':'Sign Language AI start ho gaya.');
+add('JARVESH',mode==='basic'?
+'Basic Hand Gesture AI start ho gaya.':
+'Sign Language AI start ho gaya.');
 
 }catch(error){
 
 console.error(error);
 stopHand();
+
 add('JARVESH','Hand camera open nahi ho paya. Permission check karein.');
 
 }
@@ -499,40 +662,34 @@ function onHandResults(results){
 
 if(!handRunning)return;
 
-const video=document.getElementById('handVideo');
-const canvas=document.getElementById('handCanvas');
-const ctx=canvas.getContext('2d');
-
-canvas.width=video.videoWidth;
-canvas.height=video.videoHeight;
-
-ctx.clearRect(0,0,canvas.width,canvas.height);
-ctx.drawImage(results.image,0,0,canvas.width,canvas.height);
-
 if(!results.multiHandLandmarks||results.multiHandLandmarks.length===0){
+
 document.getElementById('handStatus').textContent='Hand detect nahi hua.';
+
+updateLiveCamera('HAND NOT DETECTED','Camera ke saamne apna hand laayein.');
+
 lastHandLabel='';
 return;
 }
 
 const lm=results.multiHandLandmarks[0];
 
-drawConnectors(ctx,lm,HAND_CONNECTIONS,{
-color:'#00e5ff',lineWidth:4
-});
-
-drawLandmarks(ctx,lm,{
-color:'#ffcc00',lineWidth:2,radius:4
-});
-
 const label=classifyHand(lm);
 
 if(!label){
+
 document.getElementById('handStatus').textContent='Gesture samajh nahi aaya.';
+updateLiveCamera('GESTURE NOT RECOGNIZED','Doosra gesture try karein.');
+lastHandLabel='';
 return;
 }
 
 document.getElementById('handStatus').textContent='Detected: '+label;
+
+updateLiveCamera(
+'DETECTED: '+label,
+handMode==='basic'?'Basic Hand Gesture':'Sign Language Letter'
+);
 
 const now=Date.now();
 
@@ -545,7 +702,9 @@ lastHandTime=now;
 if(handMode==='basic'){
 
 const message='Aapka gesture: '+label;
+
 document.getElementById('signOutput').textContent=message;
+
 add('JARVESH',message);
 say(message);
 
@@ -553,6 +712,7 @@ say(message);
 
 signText+=label;
 updateSignOutput();
+
 add('JARVESH','Sign letter detected: '+label);
 
 }
@@ -573,6 +733,11 @@ handModel.close();
 handModel=null;
 }
 
+if(handStream){
+handStream.getTracks().forEach(t=>t.stop());
+handStream=null;
+}
+
 const video=document.getElementById('handVideo');
 
 if(video.srcObject){
@@ -582,6 +747,8 @@ video.srcObject=null;
 
 document.getElementById('handPanel').style.display='none';
 document.getElementById('handStatus').textContent='Camera stopped.';
+
+closeFullCamera();
 }
 
 // SIGN TEXT CONTROLS
@@ -616,9 +783,9 @@ add('You',c);
 
 let command=c.toLowerCase().trim();
 
-// BODY LANGUAGE ONLY
+// BODY LANGUAGE
 if(command==='body language'||command==='body'||command==='body detection'){
-say('Body Language AI start kar raha hoon.');
+say('Body detection start kar raha hoon.');
 await startBody();
 return;
 }
@@ -687,11 +854,17 @@ x=a.length?'Aapki saved baatein: '+a.join(' | '):'Abhi koi baat save nahi hai.';
 
 else if(x.startsWith('SET_ALARM:')){
 let m=Number(x.split(':')[1]);
+
+if(Number.isFinite(m)&&m>0){
 x=m+' minute ka alarm set hai. Page khula rakhein.';
+
 setTimeout(()=>{
 add('JARVESH','Aapka alarm baj gaya hai!');
 say('Aapka alarm baj gaya hai!');
 },m*60000);
+}else{
+x='Alarm time sahi nahi hai.';
+}
 }
 
 else if(x==='CLEAR_CHAT'){
@@ -703,8 +876,10 @@ add('JARVESH',x);
 say(x);
 
 }catch(error){
+
 console.error(error);
 add('JARVESH','Server se connection nahi ho paya. Dobara try karein.');
+
 }
 
 }
@@ -712,7 +887,9 @@ add('JARVESH','Server se connection nahi ho paya. Dobara try karein.');
 // SEND
 document.getElementById('form').onsubmit=e=>{
 e.preventDefault();
+
 let c=input.value.trim();
+
 if(c){
 input.value='';
 run(c);
