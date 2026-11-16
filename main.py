@@ -7,12 +7,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from zoneinfo import ZoneInfo
 import urllib.parse
-import urllib.request
-import urllib.error
-import json
-import os
-
-# ================= SETTINGS =================
+import random
+import re
 
 BASE = Path(__file__).parent
 
@@ -24,141 +20,112 @@ app.mount(
     name="static"
 )
 
-API_KEY = os.getenv("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")
-MODEL = os.getenv(
-    "OPENROUTER_MODEL",
-    "openai/gpt-4o-mini"
-)
-
-# ================= COMMAND MODEL =================
 
 class Command(BaseModel):
     command: str
 
 
-# ================= AI SYSTEM =================
+def detect_language(text):
+    # Hindi written in Devanagari
+    if re.search(r"[\u0900-\u097F]", text):
+        return "hindi"
 
-def ai_answer(raw):
+    words = text.lower().split()
 
-    if not API_KEY:
-        return (
-            "AI connect nahi hai. "
-            "Render Environment mein OPENROUTER_API_KEY set kijiye."
-        )
-
-    system_prompt = """
-You are JARVESH, a friendly AI assistant created by Arpit Shukla.
-
-LANGUAGE RULES:
-1. If the user writes in Hindi, reply in Hindi.
-2. If the user writes in English, reply in English.
-3. If the user writes in Hinglish, reply in Hinglish.
-4. Detect the language of every new message.
-5. Never force every answer into Hindi.
-6. Understand normal conversations, questions and commands.
-7. Keep answers clear, natural and helpful.
-
-IDENTITY:
-Your name is JARVESH.
-Your creator is Arpit Shukla.
-You are an AI assistant.
-"""
-
-    data = {
-        "model": MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
-                "role": "user",
-                "content": raw
-            }
-        ],
-        "temperature": 0.7
+    hinglish_words = {
+        "hai", "hain", "ho", "kya", "kaise", "mera",
+        "meri", "tum", "tumhara", "batao", "kar",
+        "karo", "nahi", "haan", "acha", "achha",
+        "kyun", "kaun", "aur", "mein", "mujhe"
     }
 
-    request = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=json.dumps(data).encode("utf-8"),
-        headers={
-            "Authorization": "Bearer " + API_KEY,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://jarvesh.onrender.com",
-            "X-Title": "JARVESH"
-        },
-        method="POST"
-    )
+    if any(word in hinglish_words for word in words):
+        return "hinglish"
 
-    try:
+    return "english"
 
-        with urllib.request.urlopen(
-            request,
-            timeout=45
-        ) as response:
-
-            result = json.loads(
-                response.read().decode("utf-8")
-            )
-
-            reply = result["choices"][0]["message"]["content"]
-
-            if not reply:
-                return "AI ne khaali response diya. Dobara try kijiye."
-
-            return reply.strip()
-
-    except urllib.error.HTTPError as e:
-
-        error_text = e.read().decode(
-            "utf-8",
-            errors="replace"
-        )
-
-        print("OPENROUTER ERROR:", error_text)
-
-        if e.code == 401:
-            return "API key invalid hai. Render Environment mein key check kijiye."
-
-        if e.code == 402:
-            return "Is model ke liye available credits nahi hain. Free model select kijiye."
-
-        if e.code == 429:
-            return "AI ki request limit poori ho gayi hai. Thodi der baad try kijiye."
-
-        return f"AI server error ({e.code}). Render Logs check kijiye."
-
-    except Exception as e:
-
-        print("AI ERROR:", str(e))
-
-        return (
-            "Maaf kijiye, AI se connection nahi ho paya. "
-            "Internet aur Render settings check kijiye."
-        )
-
-
-# ================= COMMAND SYSTEM =================
 
 def answer(raw):
-
     c = raw.strip().lower()
+    lang = detect_language(raw)
 
     if not c:
         return "Please type something."
 
+    # GREETINGS
+    if c in {"hi", "hello", "hey", "namaste", "hii"}:
+        if lang == "hindi":
+            return "नमस्ते! मैं JARVESH हूँ। बताइए, मैं आपकी क्या मदद कर सकता हूँ?"
+        if lang == "hinglish":
+            return "Namaste! Main JARVESH hoon. Batao, kya help chahiye?"
+        return "Hello! I am JARVESH. How can I help you today?"
+
+    # HOW ARE YOU
+    if any(x in c for x in ["kaise ho", "how are you", "कैसे हो"]):
+        if lang == "hindi":
+            return "मैं बिल्कुल ठीक हूँ! आप कैसे हैं?"
+        if lang == "hinglish":
+            return "Main bilkul theek hoon! Tum kaise ho?"
+        return "I am doing great! How are you?"
+
+    # NAME
+    if any(x in c for x in ["tumhara naam", "your name", "आपका नाम", "naam kya hai"]):
+        if lang == "hindi":
+            return "मेरा नाम JARVESH है।"
+        if lang == "hinglish":
+            return "Mera naam JARVESH hai."
+        return "My name is JARVESH."
+
+    # CREATOR
+    if any(x in c for x in ["creator", "kisne banaya", "who created you", "who made you"]):
+        if lang == "hindi":
+            return "मुझे Arpit Shukla ने बनाया है।"
+        if lang == "hinglish":
+            return "Mujhe Arpit Shukla ne banaya hai."
+        return "I was created by Arpit Shukla."
+
     # TIME
-    if c in {"time", "samay", "kitne baje hain"}:
-        return "Abhi time hai " + datetime.now(
-            ZoneInfo("Asia/Kolkata")
-        ).strftime("%I:%M %p")
+    if c in {"time", "samay", "time batao", "what time is it"}:
+        now = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%I:%M %p")
+        if lang == "hindi":
+            return "अभी समय है " + now
+        if lang == "hinglish":
+            return "Abhi time hai " + now
+        return "The current time is " + now
 
     # DATE
-    if c in {"date", "tarikh", "aaj ki date"}:
-        return "Aaj ki date hai " + datetime.now(
-            ZoneInfo("Asia/Kolkata")
-        ).strftime("%d %B %Y")
+    if c in {"date", "tarikh", "aaj ki date", "what is the date"}:
+        now = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %B %Y")
+        if lang == "hindi":
+            return "आज की तारीख है " + now
+        if lang == "hinglish":
+            return "Aaj ki date hai " + now
+        return "Today's date is " + now
+
+    # THANK YOU
+    if any(x in c for x in ["thank you", "thanks", "shukriya", "धन्यवाद"]):
+        if lang == "hindi":
+            return "आपका स्वागत है!"
+        if lang == "hinglish":
+            return "Koi baat nahi! Main madad ke liye yahan hoon."
+        return "You're welcome! Happy to help."
+
+    # JOKE
+    if c in {"joke", "mazak", "tell me a joke"}:
+        jokes = {
+            "hindi": "कंप्यूटर डॉक्टर के पास क्यों गया? क्योंकि उसे वायरस हो गया था!",
+            "hinglish": "Computer doctor ke paas kyun gaya? Kyunki usko virus ho gaya tha!",
+            "english": "Why did the computer go to the doctor? Because it caught a virus!"
+        }
+        return jokes[lang]
+
+    # HELP
+    if c in {"help", "commands", "/commands", "command list"}:
+        return (
+            "Commands: hello, kaise ho, tumhara naam, creator, "
+            "time, date, joke, open youtube, open google, "
+            "open github, search [query], youtube search [query]."
+        )
 
     # OPEN WEBSITES
     sites = {
@@ -177,7 +144,6 @@ def answer(raw):
     }
 
     for name, url in sites.items():
-
         if c in {
             f"open {name}",
             f"{name} kholo",
@@ -187,9 +153,7 @@ def answer(raw):
 
     # YOUTUBE SEARCH
     if c.startswith("youtube search "):
-
         query = raw.strip()[15:]
-
         return (
             "OPEN_URL:https://www.youtube.com/results?search_query="
             + urllib.parse.quote_plus(query)
@@ -197,67 +161,53 @@ def answer(raw):
 
     # GOOGLE SEARCH
     if c.startswith("search ") or c.startswith("google "):
-
         query = raw.strip().split(" ", 1)[1]
-
         return (
             "OPEN_URL:https://www.google.com/search?q="
             + urllib.parse.quote_plus(query)
         )
 
-    # LOCAL PC APPS
-    if c.startswith("open ") and any(
-        app_name in c
-        for app_name in [
-            "notepad",
-            "calculator",
-            "paint",
-            "task manager",
-            "cmd",
-            "powershell",
-            "explorer"
-        ]
-    ):
-        return (
-            "Ye PC command hosted website se execute nahi ho sakti. "
-            "Iske liye JARVESH Desktop Agent chahiye."
-        )
+    # BASIC CONVERSATION
+    if any(x in c for x in ["what can you do", "tum kya kar sakte ho", "kya kar sakte ho"]):
+        if lang == "hindi":
+            return "मैं समय, तारीख, वेबसाइट खोलने और Google या YouTube पर खोजने में मदद कर सकता हूँ।"
+        if lang == "hinglish":
+            return "Main time, date, websites open aur Google/YouTube search kar sakta hoon."
+        return "I can tell the time and date, open websites, and search Google or YouTube."
 
-    # ALL OTHER MESSAGES GO TO AI
-    return ai_answer(raw)
+    if any(x in c for x in ["good morning", "good evening", "good night"]):
+        if lang == "hindi":
+            return "आपका दिन शुभ हो!"
+        if lang == "hinglish":
+            return "Aapka din achha rahe!"
+        return "Have a wonderful day!"
 
+    # UNKNOWN MESSAGE
+    if lang == "hindi":
+        return "माफ कीजिए, मैं अभी इस बात को समझ नहीं पाया। 'help' लिखकर commands देखिए।"
 
-# ================= WEBSITE =================
+    if lang == "hinglish":
+        return "Maaf kijiye, main abhi ye baat samajh nahi paya. 'help' likhkar commands dekhiye."
+
+    return "Sorry, I don't understand that yet. Type 'help' to see my commands."
+
 
 @app.get("/", response_class=HTMLResponse)
 def home():
+    return (
+        BASE / "static" / "index.html"
+    ).read_text(encoding="utf-8")
 
-    index_file = BASE / "static" / "index.html"
-
-    return index_file.read_text(
-        encoding="utf-8"
-    )
-
-
-# ================= API =================
 
 @app.post("/api/command")
 def command_api(payload: Command):
+    return {"reply": answer(payload.command)}
 
-    reply = answer(payload.command)
-
-    return {
-        "reply": reply
-    }
-
-
-# ================= HEALTH CHECK =================
 
 @app.get("/health")
 def health():
-
     return {
         "status": "online",
         "app": "JARVESH",
-        "ai_configured": bool(API_KEY)
+        "ai_required": False
     }
