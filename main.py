@@ -1,3 +1,4 @@
+
 from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI
@@ -6,47 +7,102 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from zoneinfo import ZoneInfo
 import urllib.parse
+import urllib.request
+import json
+import os
 
 BASE = Path(__file__).parent
 app = FastAPI(title="JARVESH")
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 
+API_KEY = os.getenv("OPENAI_API_KEY")
+MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
 class Command(BaseModel):
     command: str
 
+def ai_answer(raw):
+    if not API_KEY:
+        return "AI abhi connect nahi hai. Render Environment mein OPENAI_API_KEY set kijiye."
+
+    system_prompt = """
+You are JARVESH, a friendly AI assistant created by Arpit Shukla.
+
+IMPORTANT LANGUAGE RULES:
+- If user writes in Hindi, reply in Hindi.
+- If user writes in English, reply in English.
+- If user writes in Hinglish, reply in Hinglish.
+- Always detect and follow the language of the latest user message.
+- Do not always reply in Hindi.
+- Understand normal conversations and questions.
+- Be helpful, clear and friendly.
+"""
+
+    data = {
+        "model": MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": raw}
+        ],
+        "temperature": 0.7
+    }
+
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/chat/completions",
+        data=json.dumps(data).encode("utf-8"),
+        headers={
+            "Authorization": "Bearer " + API_KEY,
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=45) as response:
+            result = json.loads(response.read().decode("utf-8"))
+            return result["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        print("AI ERROR:", str(e))
+        return "Maaf kijiye, AI se connection nahi ho paya. Render logs aur API settings check kijiye."
+
 def answer(raw):
     c = raw.strip().lower()
-    if not c: return "Koi command likhiye."
-    if c in {"hello", "hi", "hey", "namaste"}: return "Namaste! Main JARVESH hoon. Bataiye, kya karna hai?"
-    if "kaise ho" in c or "how are you" in c: return "Main bilkul theek hoon. Aap kaise hain?"
-    if "tumhara naam" in c or "your name" in c: return "Mera naam JARVESH hai."
-    if "creator" in c or "kisne banaya" in c: return "Mujhe Arpit Shukla ne banaya hai."
-    if c in {"time", "samay"}: return "Abhi time hai " + datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%I:%M %p")
-    if c in {"date", "tarikh"}: return "Aaj ki date hai " + datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %B %Y")
-    if c in {"joke", "mazak"}: return "Computer doctor ke paas kyun gaya? Usko virus ho gaya tha!"
-    if c in {"help", "commands", "/commands", "command list"}:
-        return "Commands: hello, kaise ho, tumhara naam, creator, time, date, open youtube/google/wikipedia/gmail/github/chatgpt, search [query], youtube search [query], yaad rakho [baat], meri memory, alarm [minutes], joke, clear chat."
-    sites = {"youtube":"https://youtube.com","google":"https://google.com","wikipedia":"https://wikipedia.org","gmail":"https://mail.google.com","github":"https://github.com","chatgpt":"https://chatgpt.com","instagram":"https://instagram.com","facebook":"https://facebook.com","whatsapp":"https://web.whatsapp.com","discord":"https://discord.com/app","minecraft":"https://minecraft.net","maps":"https://maps.google.com"}
-    for name, url in sites.items():
-        if c in {f"open {name}", f"{name} kholo"}: return "OPEN_URL:" + url
+
+    if not c:
+        return "Please type something."
+
+    if c in {"time", "samay"}:
+        return "Current time: " + datetime.now(
+            ZoneInfo("Asia/Kolkata")
+        ).strftime("%I:%M %p")
+
+    if c in {"date", "tarikh"}:
+        return "Today's date: " + datetime.now(
+            ZoneInfo("Asia/Kolkata")
+        ).strftime("%d %B %Y")
+
+    if c in {"open youtube", "youtube kholo"}:
+        return "OPEN_URL:https://youtube.com"
+
+    if c in {"open google", "google kholo"}:
+        return "OPEN_URL:https://google.com"
+
+    if c in {"open github", "github kholo"}:
+        return "OPEN_URL:https://github.com"
+
     if c.startswith("youtube search "):
-        return "OPEN_URL:https://www.youtube.com/results?search_query=" + urllib.parse.quote_plus(c[14:])
+        query = raw.strip()[15:]
+        return "OPEN_URL:https://www.youtube.com/results?search_query=" + urllib.parse.quote_plus(query)
+
     if c.startswith("search ") or c.startswith("google "):
-        return "OPEN_URL:https://www.google.com/search?q=" + urllib.parse.quote_plus(c.split(" ",1)[1])
-    if c.startswith("yaad rakho"):
-        fact = raw.strip()[len("yaad rakho"):].strip()
-        return "SAVE_MEMORY:" + fact if fact else "Kya yaad rakhna hai?"
-    if c in {"meri memory", "maine kya bataya"}: return "GET_MEMORY"
-    if c.startswith("alarm "):
-        try:
-            n = int(c.split()[1])
-            if 1 <= n <= 1440: return f"SET_ALARM:{n}"
-        except (ValueError, IndexError): pass
-        return "Example: alarm 5 (1 se 1440 minute)."
-    if c in {"clear chat", "chat clear"}: return "CLEAR_CHAT"
-    if c.startswith("open ") and any(x in c for x in ["notepad","calculator","paint","task manager","cmd","powershell","control panel","explorer"]):
-        return "Ye PC command hosted website se execute nahi ho sakti. Iske liye aapke PC par alag JARVESH Desktop Agent chahiye."
-    return "Maaf kijiye, ye command abhi samajh nahi aayi. 'help' likhkar commands dekhiye."
+        query = raw.strip().split(" ", 1)[1]
+        return "OPEN_URL:https://www.google.com/search?q=" + urllib.parse.quote_plus(query)
+
+    if c.startswith("open notepad") or c.startswith("open calculator"):
+        return "Ye PC command hosted website se execute nahi ho sakti."
+
+    # Normal conversation and all other questions go to AI
+    return ai_answer(raw)
 
 @app.get("/", response_class=HTMLResponse)
 def home():
