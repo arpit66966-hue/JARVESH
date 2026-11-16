@@ -1,15 +1,432 @@
+
 <!doctype html>
-<html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>JARVESH</title>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JARVESH</title>
+
 <style>
-*{box-sizing:border-box}body{margin:0;background:#080f1b;color:#eaf2ff;font-family:Segoe UI,Arial;min-height:100vh;display:grid;place-items:center;padding:16px}.app{width:min(1050px,100%);height:92vh;min-height:540px;background:#101b2b;border:1px solid #29415e;border-radius:18px;display:grid;grid-template-columns:1fr 270px;overflow:hidden}main{display:flex;flex-direction:column;min-width:0}.top{padding:20px;border-bottom:1px solid #29415e;display:flex;justify-content:space-between}.brand{font-size:25px;font-weight:800;color:#36b7ff;letter-spacing:2px}.muted{color:#9ab0c9;font-size:12px}.chat{padding:20px;overflow:auto;flex:1}.msg{padding:12px 15px;border-radius:13px;margin:0 0 13px;max-width:85%;white-space:pre-wrap;line-height:1.45}.bot{background:#1b2b40}.user{background:#075985;margin-left:auto}.who{font-size:11px;color:#7dd3fc;font-weight:bold;margin-bottom:4px}.bar{display:flex;gap:8px;padding:14px;border-top:1px solid #29415e}.bar input{flex:1;min-width:0;padding:12px;background:#091321;color:white;border:1px solid #35506f;border-radius:9px}.btn{background:#168bd0;color:white;border:0;border-radius:9px;padding:0 15px;font-weight:bold;cursor:pointer}.green{background:#176b4d}aside{padding:18px;background:#0b1523;border-left:1px solid #29415e;overflow:auto}aside h3{font-size:13px;color:#36b7ff}aside button{display:block;width:100%;text-align:left;margin:7px 0;padding:10px;background:#14243a;color:white;border:1px solid #29415e;border-radius:8px;cursor:pointer}aside small{display:block;color:#9ab0c9}@media(max-width:700px){.app{grid-template-columns:1fr}.side{display:none}}
-</style></head><body><div class="app"><main><header class="top"><div><div class="brand">JARVESH</div><div class="muted">PERSONAL AI ASSISTANT · WEB EDITION</div></div><div><span id="status" class="muted">● ONLINE</span><br><select id="voice"><option value="default">Default voice</option><option value="male">Male</option><option value="female">Female</option></select></div></header><section class="chat" id="chat"><div class="msg bot"><div class="who">JARVESH</div>Namaste! Main JARVESH hoon. 'help' likhkar commands dekhiye.</div></section><form class="bar" id="form"><input id="input" placeholder="JARVESH ko command dein..." autocomplete="off"><button class="btn">SEND</button><button type="button" class="btn green" id="mic">MIC</button></form></main><aside class="side"><h3>COMMAND CENTER</h3><div id="commands"></div><h3>IMPORTANT</h3><small>Website se visitor ke PC ke apps control nahi honge. Uske liye alag, permission-based desktop agent chahiye.</small></aside></div>
+*{box-sizing:border-box}
+body{margin:0;background:#080f1b;color:#eaf2ff;font-family:Segoe UI,Arial;min-height:100vh;display:grid;place-items:center;padding:16px}
+.app{width:min(1050px,100%);height:92vh;min-height:540px;background:#101b2b;border:1px solid #29415e;border-radius:18px;display:grid;grid-template-columns:1fr 270px;overflow:hidden}
+main{display:flex;flex-direction:column;min-width:0}
+.top{padding:20px;border-bottom:1px solid #29415e;display:flex;justify-content:space-between}
+.brand{font-size:25px;font-weight:800;color:#36b7ff;letter-spacing:2px}
+.muted{color:#9ab0c9;font-size:12px}
+.chat{padding:20px;overflow:auto;flex:1}
+.msg{padding:12px 15px;border-radius:13px;margin:0 0 13px;max-width:85%;white-space:pre-wrap;line-height:1.45}
+.bot{background:#1b2b40}
+.user{background:#075985;margin-left:auto}
+.who{font-size:11px;color:#7dd3fc;font-weight:bold;margin-bottom:4px}
+.bar{display:flex;gap:8px;padding:14px;border-top:1px solid #29415e}
+.bar input{flex:1;min-width:0;padding:12px;background:#091321;color:white;border:1px solid #35506f;border-radius:9px}
+.btn{background:#168bd0;color:white;border:0;border-radius:9px;padding:10px 15px;font-weight:bold;cursor:pointer}
+.green{background:#176b4d}
+aside{padding:18px;background:#0b1523;border-left:1px solid #29415e;overflow:auto}
+aside h3{font-size:13px;color:#36b7ff}
+aside button{display:block;width:100%;text-align:left;margin:7px 0;padding:10px;background:#14243a;color:white;border:1px solid #29415e;border-radius:8px;cursor:pointer}
+aside small{display:block;color:#9ab0c9}
+#bodyPanel{display:none;padding:12px;background:#091321;border-top:1px solid #29415e}
+#bodyVideo{width:100%;max-height:300px;object-fit:contain;background:#000;border-radius:10px}
+#bodyStatus{color:#36b7ff;margin:8px 0;font-size:14px}
+@media(max-width:700px){.app{grid-template-columns:1fr}.side{display:none}}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+</head>
+
+<body>
+<div class="app">
+<main>
+
+<header class="top">
+<div>
+<div class="brand">JARVESH</div>
+<div class="muted">PERSONAL AI ASSISTANT · WEB EDITION</div>
+</div>
+<div>
+<span id="status" class="muted">● ONLINE</span><br>
+<select id="voice">
+<option value="default">Default voice</option>
+<option value="male">Male</option>
+<option value="female">Female</option>
+</select>
+</div>
+</header>
+
+<section class="chat" id="chat">
+<div class="msg bot">
+<div class="who">JARVESH</div>
+Namaste! Main JARVESH hoon. 'help' likhkar commands dekhiye.
+</div>
+</section>
+
+<div id="bodyPanel">
+<strong>JARVESH BODY LANGUAGE AI</strong>
+<div id="bodyStatus">Camera start hone ka intezar...</div>
+<video id="bodyVideo" autoplay playsinline muted></video>
+<canvas id="bodyCanvas" style="display:none"></canvas>
+<button class="btn" onclick="stopBody()">STOP CAMERA</button>
+</div>
+
+<form class="bar" id="form">
+<input id="input" placeholder="JARVESH ko command dein..." autocomplete="off">
+<button class="btn">SEND</button>
+<button type="button" class="btn green" id="mic">MIC</button>
+</form>
+
+</main>
+
+<aside class="side">
+<h3>COMMAND CENTER</h3>
+<div id="commands"></div>
+<h3>IMPORTANT</h3>
+<small>Website ke camera aur microphone ke liye browser permission zaroori hai.</small>
+</aside>
+</div>
+
 <script>
-const chat=document.getElementById('chat'),input=document.getElementById('input');
-const cmds=[['HELP','help'],['NAMASTE','namaste'],['HOW ARE YOU','kaise ho'],['YOUR NAME','tumhara naam'],['CREATOR','creator'],['TIME','time'],['DATE','date'],['YOUTUBE','open youtube'],['GOOGLE','open google'],['GITHUB','open github'],['CHATGPT','open chatgpt'],['SEARCH','search Python tutorial'],['SAVE MEMORY','yaad rakho mujhe Python pasand hai'],['CHECK MEMORY','meri memory'],['ALARM','alarm 5'],['JOKE','joke'],['CLEAR CHAT','clear chat']];
-cmds.forEach(([label,cmd])=>{let b=document.createElement('button');b.innerHTML=label+'<small>'+cmd+'</small>';b.onclick=()=>{input.value=cmd;document.getElementById('form').requestSubmit()};document.getElementById('commands').appendChild(b)});
-function add(who,msg){let d=document.createElement('div');d.className='msg '+(who==='You'?'user':'bot');let n=document.createElement('div');n.className='who';n.textContent=who;let t=document.createElement('div');t.textContent=msg;d.append(n,t);chat.appendChild(d);chat.scrollTop=chat.scrollHeight}
-function say(msg){if(!window.speechSynthesis)return;let u=new SpeechSynthesisUtterance(msg);u.lang='hi-IN';let vs=speechSynthesis.getVoices().filter(v=>v.lang.toLowerCase().startsWith('hi'));let mode=document.getElementById('voice').value;if(mode==='female')u.voice=vs.find(v=>/female|swara|kalpana/i.test(v.name))||vs[0];else if(mode==='male')u.voice=vs.find(v=>/male|madhur/i.test(v.name))||vs[0];else u.voice=vs[0];speechSynthesis.cancel();speechSynthesis.speak(u)}
-async function run(c){add('You',c);try{let r=await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:c})});let x=(await r.json()).reply;if(x.startsWith('OPEN_URL:')){window.open(x.slice(9),'_blank','noopener');x='Browser mein website khol raha hoon.'}else if(x.startsWith('SAVE_MEMORY:')){let a=JSON.parse(localStorage.getItem('jmemory')||'[]');a.push(x.slice(12));localStorage.setItem('jmemory',JSON.stringify(a));x='Ye baat is browser mein save kar li.'}else if(x==='GET_MEMORY'){let a=JSON.parse(localStorage.getItem('jmemory')||'[]');x=a.length?'Aapki saved baatein: '+a.join(' | '):'Abhi koi baat save nahi hai.'}else if(x.startsWith('SET_ALARM:')){let m=Number(x.split(':')[1]);x=m+' minute ka alarm set hai. Page khula rakhein.';setTimeout(()=>{add('JARVESH','Aapka alarm baj gaya hai!');say('Aapka alarm baj gaya hai!')},m*60000)}else if(x==='CLEAR_CHAT'){chat.innerHTML='';x='Chat clear kar di.'}add('JARVESH',x);say(x)}catch(e){add('JARVESH','Server se connection nahi ho paya. Dobara try karein.')}}
-document.getElementById('form').onsubmit=e=>{e.preventDefault();let c=input.value.trim();if(c){input.value='';run(c)}};
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;document.getElementById('mic').onclick=()=>{if(!SR){add('JARVESH','Is browser mein voice recognition supported nahi hai.');return}let rec=new SR();rec.lang='hi-IN';rec.onstart=()=>document.getElementById('status').textContent='● LISTENING';rec.onend=()=>document.getElementById('status').textContent='● ONLINE';rec.onresult=e=>{input.value=e.results[0][0].transcript;document.getElementById('form').requestSubmit()};rec.onerror=()=>add('JARVESH','Microphone permission check karein.');rec.start()};
-</script></body></html>
+const chat=document.getElementById('chat');
+const input=document.getElementById('input');
+
+const cmds=[
+['HELP','help'],
+['NAMASTE','namaste'],
+['HOW ARE YOU','kaise ho'],
+['YOUR NAME','tumhara naam'],
+['CREATOR','creator'],
+['TIME','time'],
+['DATE','date'],
+['YOUTUBE','open youtube'],
+['GOOGLE','open google'],
+['GITHUB','open github'],
+['CHATGPT','open chatgpt'],
+['SEARCH','search Python tutorial'],
+['BODY LANGUAGE','body language'],
+['STOP BODY LANGUAGE','stop body language'],
+['JOKE','joke'],
+['CLEAR CHAT','clear chat']
+];
+
+cmds.forEach(([label,cmd])=>{
+let b=document.createElement('button');
+b.innerHTML=label+'<small>'+cmd+'</small>';
+b.onclick=()=>{
+input.value=cmd;
+document.getElementById('form').requestSubmit();
+};
+document.getElementById('commands').appendChild(b);
+});
+
+function add(who,msg){
+let d=document.createElement('div');
+d.className='msg '+(who==='You'?'user':'bot');
+let n=document.createElement('div');
+n.className='who';
+n.textContent=who;
+let t=document.createElement('div');
+t.textContent=msg;
+d.append(n,t);
+chat.appendChild(d);
+chat.scrollTop=chat.scrollHeight;
+}
+
+function say(msg){
+if(!window.speechSynthesis)return;
+let u=new SpeechSynthesisUtterance(msg);
+u.lang='hi-IN';
+let vs=speechSynthesis.getVoices().filter(v=>v.lang.toLowerCase().startsWith('hi'));
+let mode=document.getElementById('voice').value;
+if(mode==='female')u.voice=vs.find(v=>/female|swara|kalpana/i.test(v.name))||vs[0];
+else if(mode==='male')u.voice=vs.find(v=>/male|madhur/i.test(v.name))||vs[0];
+else u.voice=vs[0];
+speechSynthesis.cancel();
+speechSynthesis.speak(u);
+}
+
+// BODY LANGUAGE AI
+
+let bodyCamera=null;
+let poseModel=null;
+let bodyRunning=false;
+let lastBodyMessage='';
+
+async function startBody(){
+
+if(bodyRunning)return;
+
+document.getElementById('bodyPanel').style.display='block';
+document.getElementById('bodyStatus').textContent='Camera permission maangi ja rahi hai...';
+
+try{
+
+const video=document.getElementById('bodyVideo');
+
+const stream=await navigator.mediaDevices.getUserMedia({
+video:{facingMode:'user'},
+audio:false
+});
+
+video.srcObject=stream;
+await video.play();
+
+bodyRunning=true;
+
+poseModel=new Pose({
+locateFile:(file)=>{
+return 'https://cdn.jsdelivr.net/npm/@mediapipe/pose/'+file;
+}
+});
+
+poseModel.setOptions({
+modelComplexity:1,
+smoothLandmarks:true,
+enableSegmentation:false,
+minDetectionConfidence:0.6,
+minTrackingConfidence:0.6
+});
+
+poseModel.onResults(onPoseResults);
+
+bodyCamera=new Camera(video,{
+onFrame:async()=>{
+if(bodyRunning){
+await poseModel.send({image:video});
+}
+},
+width:640,
+height:480
+});
+
+bodyCamera.start();
+
+document.getElementById('bodyStatus').textContent='Camera ON - Body detect ho rahi hai.';
+add('JARVESH','Body Language AI start ho gaya hai.');
+
+}catch(error){
+
+console.error(error);
+stopBody();
+
+document.getElementById('bodyStatus').textContent='Camera start nahi hua. Permission aur HTTPS check karein.';
+add('JARVESH','Camera open nahi ho paya. Browser camera permission allow karein.');
+
+}
+
+}
+
+function onPoseResults(results){
+
+if(!bodyRunning)return;
+
+const video=document.getElementById('bodyVideo');
+const canvas=document.getElementById('bodyCanvas');
+const ctx=canvas.getContext('2d');
+
+canvas.width=video.videoWidth;
+canvas.height=video.videoHeight;
+
+ctx.save();
+ctx.clearRect(0,0,canvas.width,canvas.height);
+ctx.drawImage(results.image,0,0,canvas.width,canvas.height);
+
+if(results.poseLandmarks){
+
+drawConnectors(ctx,results.poseLandmarks,POSE_CONNECTIONS,{
+color:'#00e5ff',
+lineWidth:4
+});
+
+drawLandmarks(ctx,results.poseLandmarks,{
+color:'#ffcc00',
+lineWidth:2,
+radius:4
+});
+
+const lm=results.poseLandmarks;
+const leftShoulder=lm[11];
+const rightShoulder=lm[12];
+const leftHip=lm[23];
+const rightHip=lm[24];
+
+let message='Body detected';
+
+if(leftShoulder.visibility>0.5 &&
+rightShoulder.visibility>0.5 &&
+leftHip.visibility>0.5 &&
+rightHip.visibility>0.5){
+
+const shoulderY=(leftShoulder.y+rightShoulder.y)/2;
+const hipY=(leftHip.y+rightHip.y)/2;
+
+if(hipY-shoulderY>0.1){
+message='Upper body detected - posture visible';
+}
+}
+
+document.getElementById('bodyStatus').textContent=message;
+
+}else{
+document.getElementById('bodyStatus').textContent='Body camera mein nahi mili.';
+}
+
+ctx.restore();
+}
+
+function stopBody(){
+
+bodyRunning=false;
+
+if(bodyCamera){
+bodyCamera.stop();
+bodyCamera=null;
+}
+
+if(poseModel){
+poseModel.close();
+poseModel=null;
+}
+
+const video=document.getElementById('bodyVideo');
+
+if(video.srcObject){
+video.srcObject.getTracks().forEach(track=>track.stop());
+video.srcObject=null;
+}
+
+document.getElementById('bodyPanel').style.display='none';
+document.getElementById('status').textContent='● ONLINE';
+
+}
+
+// CHAT COMMAND SYSTEM
+
+async function run(c){
+
+add('You',c);
+
+let command=c.toLowerCase().trim();
+
+if(
+command.includes('body language') ||
+command.includes('body detection') ||
+command==='body'
+){
+
+say('Body Language AI start kar raha hoon.');
+await startBody();
+return;
+
+}
+
+if(
+command.includes('stop body') ||
+command.includes('camera band')
+){
+
+stopBody();
+add('JARVESH','Body Language camera band kar diya.');
+say('Camera band kar diya.');
+return;
+
+}
+
+try{
+
+let r=await fetch('/api/command',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({command:c})
+});
+
+let data=await r.json();
+let x=data.reply;
+
+if(x.startsWith('OPEN_URL:')){
+window.open(x.slice(9),'_blank','noopener');
+x='Browser mein website khol raha hoon.';
+}
+
+else if(x.startsWith('SAVE_MEMORY:')){
+let a=JSON.parse(localStorage.getItem('jmemory')||'[]');
+a.push(x.slice(12));
+localStorage.setItem('jmemory',JSON.stringify(a));
+x='Ye baat is browser mein save kar li.';
+}
+
+else if(x==='GET_MEMORY'){
+let a=JSON.parse(localStorage.getItem('jmemory')||'[]');
+x=a.length?'Aapki saved baatein: '+a.join(' | '):'Abhi koi baat save nahi hai.';
+}
+
+else if(x.startsWith('SET_ALARM:')){
+let m=Number(x.split(':')[1]);
+x=m+' minute ka alarm set hai. Page khula rakhein.';
+setTimeout(()=>{
+add('JARVESH','Aapka alarm baj gaya hai!');
+say('Aapka alarm baj gaya hai!');
+},m*60000);
+}
+
+else if(x==='CLEAR_CHAT'){
+chat.innerHTML='';
+x='Chat clear kar di.';
+}
+
+add('JARVESH',x);
+say(x);
+
+}catch(e){
+add('JARVESH','Server se connection nahi ho paya. Dobara try karein.');
+}
+
+}
+
+document.getElementById('form').onsubmit=e=>{
+e.preventDefault();
+let c=input.value.trim();
+if(c){
+input.value='';
+run(c);
+}
+};
+
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+
+document.getElementById('mic').onclick=()=>{
+
+if(!SR){
+add('JARVESH','Is browser mein voice recognition supported nahi hai.');
+return;
+}
+
+let rec=new SR();
+rec.lang='hi-IN';
+
+rec.onstart=()=>{
+document.getElementById('status').textContent='● LISTENING';
+};
+
+rec.onend=()=>{
+document.getElementById('status').textContent='● ONLINE';
+};
+
+rec.onresult=e=>{
+input.value=e.results[0][0].transcript;
+document.getElementById('form').requestSubmit();
+};
+
+rec.onerror=()=>{
+add('JARVESH','Microphone permission check karein.');
+};
+
+rec.start();
+
+};
+
+</script>
+</body>
+</html>
