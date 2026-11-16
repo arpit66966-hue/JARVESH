@@ -100,7 +100,7 @@ aside small{display:block;color:#9ab0c9}
 <section class="chat" id="chat">
 <div class="msg bot">
 <div class="who">JARVESH</div>
-Hello! I am JARVESH. Type help to see commands.
+hello! i am jarvesh. type help to see commands.
 </div>
 </section>
 
@@ -132,9 +132,9 @@ This is not a complete ISL translator.
 </div>
 
 <form class="bar" id="form">
-<input id="input" placeholder="Send a message to JARVESH..." autocomplete="off">
+<input id="input" placeholder="send a message to jarvesh..." autocomplete="off">
 <button class="btn">SEND</button>
-<button type="button" class="btn green" id="mic">MIC</button>
+<button type="button" class="btn green" id="mic">START MIC</button>
 </form>
 
 </main>
@@ -172,7 +172,7 @@ const cmds=[
 ['GOOGLE','open google'],
 ['GITHUB','open github'],
 ['CHATGPT','open chatgpt'],
-['SEARCH','search Python tutorial'],
+['SEARCH','search python tutorial'],
 ['BODY LANGUAGE','body language'],
 ['STOP BODY','stop body'],
 ['HAND GESTURE','hand gesture'],
@@ -186,14 +186,14 @@ cmds.forEach(([label,cmd])=>{
 let b=document.createElement('button');
 b.innerHTML=label+'<small>'+cmd+'</small>';
 b.onclick=()=>{
-input.value=cmd;
+input.value=cmd.toLowerCase();
 document.getElementById('form').requestSubmit();
 };
 document.getElementById('commands').appendChild(b);
 });
 
 // ===================================
-// CHAT AUTO SCROLL
+// CHAT AUTO SCROLL + LOWERCASE
 // ===================================
 
 function scrollChat(){
@@ -203,15 +203,21 @@ chat.scrollTop=chat.scrollHeight;
 }
 
 function add(who,msg){
+msg=String(msg??'').toLowerCase();
+
 let d=document.createElement('div');
-d.className='msg '+(who==='You'?'user':'bot');
+d.className='msg '+(who.toLowerCase()==='you'?'user':'bot');
+
 let n=document.createElement('div');
 n.className='who';
-n.textContent=who;
+n.textContent=who.toLowerCase();
+
 let t=document.createElement('div');
 t.textContent=msg;
+
 d.append(n,t);
 chat.appendChild(d);
+
 scrollChat();
 setTimeout(scrollChat,150);
 setTimeout(scrollChat,400);
@@ -221,9 +227,22 @@ setTimeout(scrollChat,400);
 // VOICE OUTPUT
 // ===================================
 
+let micEnabled=false;
+let micBusy=false;
+let rec=null;
+let restartTimer=null;
+let isSpeaking=false;
+
 function say(msg){
 if(!window.speechSynthesis)return;
-let u=new SpeechSynthesisUtterance(msg);
+
+isSpeaking=true;
+
+if(rec&&micBusy){
+try{rec.stop();}catch(e){}
+}
+
+let u=new SpeechSynthesisUtterance(String(msg).toLowerCase());
 u.lang='hi-IN';
 
 let vs=speechSynthesis.getVoices()
@@ -238,6 +257,17 @@ u.voice=vs.find(v=>/male|madhur/i.test(v.name))||vs[0];
 }else{
 u.voice=vs[0];
 }
+
+u.onend=()=>{
+isSpeaking=false;
+if(micEnabled)scheduleMicRestart(700);
+};
+
+u.onerror=()=>{
+isSpeaking=false;
+if(micEnabled)scheduleMicRestart(700);
+};
+
 speechSynthesis.cancel();
 speechSynthesis.speak(u);
 }
@@ -251,22 +281,26 @@ let activeCamera=null;
 function openFullCamera(videoId,title){
 const source=document.getElementById(videoId);
 const display=document.getElementById('fullCameraVideo');
+
 document.getElementById('cameraTitle').textContent=title;
 document.getElementById('cameraFullscreen').classList.add('active');
+
 display.srcObject=source.srcObject;
 display.play().catch(console.error);
+
 activeCamera=videoId;
 document.getElementById('fullCameraStatus').textContent='● CAMERA ON';
 }
 
 function updateLiveCamera(text,description){
-document.getElementById('liveGestureText').textContent=text;
-document.getElementById('liveDescription').textContent=description||'';
+document.getElementById('liveGestureText').textContent=String(text).toLowerCase();
+document.getElementById('liveDescription').textContent=String(description||'').toLowerCase();
 }
 
 function closeFullCamera(){
 const overlay=document.getElementById('cameraFullscreen');
 const display=document.getElementById('fullCameraVideo');
+
 overlay.classList.remove('active');
 display.pause();
 display.srcObject=null;
@@ -276,10 +310,10 @@ activeCamera=null;
 function stopActiveCamera(){
 if(activeCamera==='bodyVideo'){
 stopBody();
-add('JARVESH','Body camera stopped.');
+add('jarvesh','body camera stopped.');
 }else if(activeCamera==='handVideo'){
 stopHand();
-add('JARVESH','Hand AI camera stopped.');
+add('jarvesh','hand ai camera stopped.');
 }else{
 closeFullCamera();
 }
@@ -298,7 +332,7 @@ async function startBody(){
 if(bodyRunning)return;
 
 document.getElementById('bodyPanel').style.display='block';
-document.getElementById('bodyStatus').textContent='Requesting camera permission...';
+document.getElementById('bodyStatus').textContent='requesting camera permission...';
 
 try{
 const video=document.getElementById('bodyVideo');
@@ -309,6 +343,7 @@ video:true,audio:false
 
 video.srcObject=bodyStream;
 await video.play();
+
 bodyRunning=true;
 
 poseModel=new Pose({
@@ -327,11 +362,11 @@ poseModel.onResults(results=>{
 if(!bodyRunning)return;
 
 if(results.poseLandmarks){
-document.getElementById('bodyStatus').textContent='Body detected - landmarks visible';
-updateLiveCamera('BODY DETECTED','Body landmarks successfully detected.');
+document.getElementById('bodyStatus').textContent='body detected - landmarks visible';
+updateLiveCamera('body detected','body landmarks successfully detected.');
 }else{
-document.getElementById('bodyStatus').textContent='Body not detected.';
-updateLiveCamera('BODY NOT DETECTED','Position yourself in front of the camera.');
+document.getElementById('bodyStatus').textContent='body not detected.';
+updateLiveCamera('body not detected','position yourself in front of the camera.');
 }
 });
 
@@ -346,14 +381,16 @@ height:480
 });
 
 bodyCamera.start();
+
 openFullCamera('bodyVideo','JARVESH BODY DETECTION AI');
-add('JARVESH','Body detection camera started.');
-say('Body detection camera started.');
+
+add('jarvesh','body detection camera started.');
+say('body detection camera started.');
 
 }catch(error){
 console.error(error);
 stopBody();
-add('JARVESH','Camera could not start. Check camera permission.');
+add('jarvesh','camera could not start. check camera permission.');
 }
 }
 
@@ -364,19 +401,24 @@ if(bodyCamera){
 bodyCamera.stop();
 bodyCamera=null;
 }
+
 if(poseModel){
 poseModel.close();
 poseModel=null;
 }
+
 if(bodyStream){
 bodyStream.getTracks().forEach(t=>t.stop());
 bodyStream=null;
 }
+
 let video=document.getElementById('bodyVideo');
+
 if(video.srcObject){
 video.srcObject.getTracks().forEach(t=>t.stop());
 video.srcObject=null;
 }
+
 document.getElementById('bodyPanel').style.display='none';
 closeFullCamera();
 }
@@ -396,7 +438,7 @@ let handStream=null;
 
 function updateSignOutput(){
 document.getElementById('signOutput').textContent=
-signText||'No gesture detected yet.';
+(signText||'no gesture detected yet.').toLowerCase();
 }
 
 async function startHand(mode){
@@ -407,7 +449,7 @@ lastHandLabel='';
 lastHandTime=0;
 
 document.getElementById('handPanel').style.display='block';
-document.getElementById('handStatus').textContent='Loading AI model...';
+document.getElementById('handStatus').textContent='loading ai model...';
 
 try{
 const video=document.getElementById('handVideo');
@@ -444,7 +486,7 @@ try{
 const result=handModel.recognizeForVideo(video,performance.now());
 onHandResults(result);
 }catch(error){
-console.error('Gesture recognition error:',error);
+console.error('gesture recognition error:',error);
 }
 }
 },
@@ -456,15 +498,15 @@ handCamera.start();
 
 openFullCamera('handVideo','JARVESH AI GESTURE RECOGNIZER');
 
-updateLiveCamera('WAITING FOR HAND','Bring your hand in front of the camera.');
+updateLiveCamera('waiting for hand','bring your hand in front of the camera.');
 
-document.getElementById('handStatus').textContent='Pretrained AI Gesture Model ON';
-add('JARVESH','AI hand gesture camera started.');
+document.getElementById('handStatus').textContent='pretrained ai gesture model on';
+add('jarvesh','ai hand gesture camera started.');
 
 }catch(error){
 console.error(error);
 stopHand();
-add('JARVESH','AI model could not load. Check internet and camera permission.');
+add('jarvesh','ai model could not load. check internet and camera permission.');
 }
 }
 
@@ -474,28 +516,28 @@ if(!handRunning)return;
 const gesture=result.gestures?.[0]?.[0];
 
 if(!gesture||gesture.categoryName==='None'||gesture.score<0.55){
-document.getElementById('handStatus').textContent='No clear gesture detected.';
-updateLiveCamera('GESTURE NOT DETECTED','Show your hand clearly.');
+document.getElementById('handStatus').textContent='no clear gesture detected.';
+updateLiveCamera('gesture not detected','show your hand clearly.');
 lastHandLabel='';
 return;
 }
 
 const names={
-'Open_Palm':'OPEN PALM',
-'Closed_Fist':'CLOSED FIST',
-'Pointing_Up':'POINTING UP',
-'Thumb_Up':'THUMBS UP',
-'Thumb_Down':'THUMBS DOWN',
-'Victory':'VICTORY / PEACE',
-'ILoveYou':'I LOVE YOU'
+'Open_Palm':'open palm',
+'Closed_Fist':'closed fist',
+'Pointing_Up':'pointing up',
+'Thumb_Up':'thumbs up',
+'Thumb_Down':'thumbs down',
+'Victory':'victory / peace',
+'ILoveYou':'i love you'
 };
 
-const label=names[gesture.categoryName]||gesture.categoryName;
+const label=(names[gesture.categoryName]||gesture.categoryName).toLowerCase();
 
 document.getElementById('handStatus').textContent=
-'Detected: '+label+' ('+Math.round(gesture.score*100)+'%)';
+'detected: '+label+' ('+Math.round(gesture.score*100)+'%)';
 
-updateLiveCamera('DETECTED: '+label,'AI confidence: '+Math.round(gesture.score*100)+'%');
+updateLiveCamera('detected: '+label,'ai confidence: '+Math.round(gesture.score*100)+'%');
 
 const now=Date.now();
 
@@ -506,14 +548,14 @@ lastHandLabel=label;
 lastHandTime=now;
 
 if(handMode==='basic'){
-const message='Your hand gesture: '+label;
-document.getElementById('signOutput').textContent=message;
-add('JARVESH',message);
+const message='your hand gesture: '+label;
+document.getElementById('signOutput').textContent=message.toLowerCase();
+add('jarvesh',message);
 say(message);
 }else{
-signText+=label+' ';
+signText+=(label+' ').toLowerCase();
 updateSignOutput();
-add('JARVESH','Recognized gesture: '+label);
+add('jarvesh','recognized gesture: '+label);
 }
 }
 
@@ -524,23 +566,26 @@ if(handCamera){
 handCamera.stop();
 handCamera=null;
 }
+
 if(handModel){
 handModel.close();
 handModel=null;
 }
+
 if(handStream){
 handStream.getTracks().forEach(t=>t.stop());
 handStream=null;
 }
 
 const video=document.getElementById('handVideo');
+
 if(video.srcObject){
 video.srcObject.getTracks().forEach(t=>t.stop());
 video.srcObject=null;
 }
 
 document.getElementById('handPanel').style.display='none';
-document.getElementById('handStatus').textContent='Camera stopped.';
+document.getElementById('handStatus').textContent='camera stopped.';
 closeFullCamera();
 }
 
@@ -565,7 +610,7 @@ updateSignOutput();
 
 function speakSignText(){
 if(signText.trim())say(signText);
-else say('There is no text yet.');
+else say('there is no text yet.');
 }
 
 // ===================================
@@ -573,37 +618,38 @@ else say('There is no text yet.');
 // ===================================
 
 async function run(c){
-add('You',c);
+c=String(c??'').toLowerCase().trim();
+if(!c)return;
 
-let command=c.toLowerCase().trim();
+add('you',c);
 
-if(['body language','body','body detection'].includes(command)){
-say('Starting body detection.');
+if(['body language','body','body detection'].includes(c)){
+say('starting body detection.');
 await startBody();
 return;
 }
 
-if(['stop body','stop body language','camera band'].includes(command)){
+if(['stop body','stop body language','camera band'].includes(c)){
 stopBody();
-add('JARVESH','Body camera stopped.');
-say('Camera stopped.');
+add('jarvesh','body camera stopped.');
+say('camera stopped.');
 return;
 }
 
-if(['hand gesture','basic gesture'].includes(command)){
+if(['hand gesture','basic gesture'].includes(c)){
 await startHand('basic');
 return;
 }
 
-if(['sign language','sign to text'].includes(command)){
+if(['sign language','sign to text'].includes(c)){
 await startHand('sign');
 return;
 }
 
-if(['stop hand','stop hand gesture','stop sign'].includes(command)){
+if(['stop hand','stop hand gesture','stop sign'].includes(c)){
 stopHand();
-add('JARVESH','Hand AI camera stopped.');
-say('Hand camera stopped.');
+add('jarvesh','hand ai camera stopped.');
+say('hand camera stopped.');
 return;
 }
 
@@ -614,66 +660,71 @@ headers:{'Content-Type':'application/json'},
 body:JSON.stringify({command:c})
 });
 
-if(!r.ok)throw new Error('Server error');
+if(!r.ok)throw new Error('server error');
 
 let data=await r.json();
 let x=data.reply;
 
 if(typeof x!=='string'){
-x='The server returned an invalid response.';
+x='the server returned an invalid response.';
 }
 
 if(x.startsWith('OPEN_URL:')){
 window.open(x.slice(9),'_blank','noopener');
-x='Opening the website in your browser.';
+x='opening the website in your browser.';
 }
 
 else if(x.startsWith('SAVE_MEMORY:')){
 let a=JSON.parse(localStorage.getItem('jmemory')||'[]');
-a.push(x.slice(12));
+a.push(x.slice(12).toLowerCase());
 localStorage.setItem('jmemory',JSON.stringify(a));
-x='Saved this information in this browser.';
+x='saved this information in this browser.';
 }
 
 else if(x==='GET_MEMORY'){
 let a=JSON.parse(localStorage.getItem('jmemory')||'[]');
-x=a.length?'Your saved information: '+a.join(' | '):'No saved information yet.';
+x=a.length?'your saved information: '+a.join(' | '):'no saved information yet.';
 }
 
 else if(x.startsWith('SET_ALARM:')){
 let m=Number(x.split(':')[1]);
+
 if(Number.isFinite(m)&&m>0){
-x='Your alarm is set for '+m+' minutes. Keep this page open.';
+x='your alarm is set for '+m+' minutes. keep this page open.';
+
 setTimeout(()=>{
-add('JARVESH','Your alarm is ringing!');
-say('Your alarm is ringing!');
+add('jarvesh','your alarm is ringing!');
+say('your alarm is ringing!');
 },m*60000);
+
 }else{
-x='Invalid alarm time.';
+x='invalid alarm time.';
 }
 }
 
 else if(x==='CLEAR_CHAT'){
 chat.innerHTML='';
-x='Chat cleared.';
+x='chat cleared.';
 }
 
-add('JARVESH',x);
-say(x);
+add('jarvesh',String(x).toLowerCase());
+say(String(x).toLowerCase());
 
 }catch(error){
 console.error(error);
-add('JARVESH','Could not connect to the server. Please try again.');
+add('jarvesh','could not connect to the server. please try again.');
 }
 }
 
 // ===================================
-// SEND MESSAGE
+// SEND MESSAGE - ALWAYS LOWERCASE
 // ===================================
 
 document.getElementById('form').onsubmit=e=>{
 e.preventDefault();
-let c=input.value.trim();
+
+let c=input.value.trim().toLowerCase();
+
 if(c){
 input.value='';
 run(c);
@@ -685,12 +736,12 @@ run(c);
 // ===================================
 
 async function translateToEnglish(text){
+text=String(text).trim();
 
-// Agar text mein Devanagari hai, Hindi se English translate karo.
 const hasHindi=/[\u0900-\u097F]/.test(text);
 
 if(!hasHindi){
-return text;
+return text.toLowerCase();
 }
 
 const url='https://api.mymemory.translated.net/get?q='+
@@ -699,67 +750,68 @@ encodeURIComponent(text)+'&langpair=hi|en';
 const response=await fetch(url);
 
 if(!response.ok){
-throw new Error('Translation service unavailable');
+throw new Error('translation service unavailable');
 }
 
 const data=await response.json();
-
 const translated=data?.responseData?.translatedText;
 
 if(!translated){
-throw new Error('Translation failed');
+throw new Error('translation failed');
 }
 
-return translated.trim();
+return translated.trim().toLowerCase();
 }
 
 // ===================================
-// MICROPHONE - ALL MESSAGES ENGLISH
+// CONTINUOUS MICROPHONE
 // ===================================
 
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 
-document.getElementById('mic').onclick=()=>{
+function scheduleMicRestart(delay=800){
+clearTimeout(restartTimer);
 
-if(!SR){
-add('JARVESH','Voice recognition is not supported in this browser.');
-return;
+if(!micEnabled||isSpeaking)return;
+
+restartTimer=setTimeout(()=>{
+if(micEnabled&&!micBusy&&!isSpeaking){
+createRecognition();
+}
+},delay);
 }
 
-let rec=new SR();
+function createRecognition(){
+if(!SR||!micEnabled||micBusy||isSpeaking)return;
 
-// Hindi speech recognition: Hindi speech will be translated to English.
+rec=new SR();
+
 rec.lang='hi-IN';
 rec.interimResults=false;
 rec.maxAlternatives=1;
 
 rec.onstart=()=>{
+micBusy=true;
 document.getElementById('status').textContent='● LISTENING';
-};
-
-rec.onend=()=>{
-document.getElementById('status').textContent='● ONLINE';
+document.getElementById('mic').textContent='STOP MIC';
 };
 
 rec.onresult=async e=>{
-
-const spoken=e.results[0][0].transcript.trim();
+const spoken=String(e.results[0][0].transcript||'').trim();
 
 if(!spoken)return;
 
 document.getElementById('status').textContent='● TRANSLATING';
 
 try{
-
-let english=await translateToEnglish(spoken);
-
-// Common translated command corrections
-const normalized=english.toLowerCase().trim();
+const english=(await translateToEnglish(spoken)).toLowerCase().trim();
 
 const commandMap={
 'open youtube':'open youtube',
 'open you tube':'open youtube',
+'youtube kholo':'open youtube',
 'open google':'open google',
+'google kholo':'open google',
 'open github':'open github',
 'open chatgpt':'open chatgpt',
 'open chat gpt':'open chatgpt',
@@ -773,34 +825,104 @@ const commandMap={
 'clear chat':'clear chat'
 };
 
-const finalMessage=commandMap[normalized]||english;
+const finalMessage=String(commandMap[english]||english).toLowerCase().trim();
 
 input.value=finalMessage;
-
 document.getElementById('status').textContent='● ONLINE';
 
 document.getElementById('form').requestSubmit();
 
 }catch(error){
-
-console.error('Translation error:',error);
+console.error('translation error:',error);
 
 document.getElementById('status').textContent='● ONLINE';
 
-add('JARVESH','Translation failed. Please check your internet connection and try again.');
-
+add('jarvesh','translation failed. check your internet connection and try again.');
 }
-
 };
 
 rec.onerror=e=>{
+console.error('microphone error:',e.error);
+document.getElementById('status').textContent='● MIC ERROR';
+};
+
+rec.onend=()=>{
+micBusy=false;
+
+if(micEnabled&&!isSpeaking){
+document.getElementById('status').textContent='● RESTARTING MIC';
+scheduleMicRestart(900);
+}else if(!micEnabled){
 document.getElementById('status').textContent='● ONLINE';
-add('JARVESH','Microphone error: '+e.error);
+}
 };
 
+try{
 rec.start();
+}catch(error){
+micBusy=false;
+console.error(error);
+scheduleMicRestart(1500);
+}
+}
 
+async function startMic(){
+if(!SR){
+add('jarvesh','voice recognition is not supported. please use google chrome or microsoft edge.');
+return;
+}
+
+if(micEnabled)return;
+
+micEnabled=true;
+document.getElementById('mic').textContent='STOP MIC';
+
+try{
+const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+stream.getTracks().forEach(track=>track.stop());
+
+createRecognition();
+
+}catch(error){
+micEnabled=false;
+document.getElementById('mic').textContent='START MIC';
+document.getElementById('status').textContent='● MIC PERMISSION NEEDED';
+
+add('jarvesh','please allow microphone permission, then click start mic.');
+}
+}
+
+function stopMic(){
+micEnabled=false;
+clearTimeout(restartTimer);
+
+if(rec){
+const old=rec;
+rec=null;
+try{old.stop();}catch(e){}
+}
+
+micBusy=false;
+document.getElementById('status').textContent='● ONLINE';
+document.getElementById('mic').textContent='START MIC';
+}
+
+document.getElementById('mic').onclick=()=>{
+if(micEnabled)stopMic();
+else startMic();
 };
+
+// ===================================
+// AUTO START MICROPHONE
+// ===================================
+
+window.addEventListener('load',()=>{
+setTimeout(()=>{
+if(SR){
+startMic();
+}
+},1200);
+});
 
 // ===================================
 // INITIAL SETUP
