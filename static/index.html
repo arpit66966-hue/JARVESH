@@ -72,6 +72,21 @@ aside small{display:block;color:#9ab0c9}
 .avatar-panel.talking .avatar-mouth{height:22px;background:#36b7ff33;animation:talk .18s infinite alternate}
 @keyframes talk{from{transform:scaleY(.45)}to{transform:scaleY(1)}}
 @media(max-width:700px){.feature-panel{max-height:42vh}.avatar-face{width:125px;height:125px}.avatar-eyes{top:39px}.avatar-mouth{left:42px;top:80px}}
+
+/* COLOUR DETECTOR */
+.color-select-panel{display:none;padding:14px;background:#091321;border-top:1px solid #29415e}
+.color-select-panel h3{color:#36b7ff;margin:4px 0 10px}
+.color-select-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:9px 0}
+.color-select-panel select,.color-select-panel input{padding:10px;background:#101b2b;color:#fff;border:1px solid #35506f;border-radius:8px}
+.color-fullscreen{display:none;position:fixed;inset:0;z-index:100000;background:#050b14;padding:12px;grid-template-rows:auto minmax(0,1fr) auto;gap:10px}
+.color-fullscreen.active{display:grid}
+.color-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.color-stage{position:relative;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.color-stage video{width:100%;height:100%;object-fit:contain;background:#000}
+.color-stage canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.color-bottom{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;background:#14243a;border:1px solid #29415e;border-radius:10px;padding:10px}
+.color-swatch{width:30px;height:30px;border:2px solid white;border-radius:7px;display:inline-block;vertical-align:middle}
+.color-status{color:#7dd3fc;font-weight:bold}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
@@ -98,6 +113,24 @@ aside small{display:block;color:#9ab0c9}
 </div>
 </div>
 
+<div class="color-fullscreen" id="colorFullscreen">
+  <div class="color-top">
+    <div>
+      <div class="camera-title">JARVESH COLOUR DETECTOR</div>
+      <div class="muted" id="colorSelectedLabel">Selected colour: red</div>
+    </div>
+    <button class="btn red" onclick="stopColorDetection()">STOP COLOUR AI</button>
+  </div>
+  <div class="color-stage">
+    <video id="colorVideo" autoplay playsinline muted></video>
+    <canvas id="colorCanvas"></canvas>
+  </div>
+  <div class="color-bottom">
+    <div><span class="color-swatch" id="colorSwatch"></span> <span id="colorReadout">Waiting for selected colour...</span></div>
+    <div class="color-status" id="colorStatus">Starting camera...</div>
+  </div>
+</div>
+
 <div class="app">
 <main>
 <header class="top">
@@ -121,6 +154,30 @@ aside small{display:block;color:#9ab0c9}
 hello i am jarvesh type help to see commands
 </div>
 </section>
+
+<div class="color-select-panel" id="colorSelectPanel">
+<h3>JARVESH COLOUR DETECTOR</h3>
+<div class="muted">Choose a colour. JARVESH will find matching areas in the fullscreen camera and draw a box around them.</div>
+<div class="color-select-row">
+<label for="colorPreset">Choose colour:</label>
+<select id="colorPreset" onchange="applyColorPreset()">
+<option value="red">Red</option><option value="orange">Orange</option>
+<option value="yellow">Yellow</option><option value="lime">Lime</option>
+<option value="green">Green</option><option value="cyan">Cyan</option>
+<option value="blue">Blue</option><option value="navy">Navy</option>
+<option value="purple">Purple</option><option value="magenta">Magenta</option>
+<option value="pink">Pink</option><option value="brown">Brown</option>
+<option value="white">White</option><option value="grey">Grey</option>
+<option value="black">Black</option><option value="custom">Custom colour</option>
+</select>
+<input type="color" id="customColor" value="#ff0000" aria-label="Pick custom colour" onchange="chooseCustomColor()">
+</div>
+<div class="feature-actions">
+<button class="btn green" onclick="startColorDetection()">START FULLSCREEN CAMERA</button>
+<button class="btn red" onclick="closeColorPicker()">CLOSE</button>
+</div>
+<div class="muted">A short repeating alert sounds while the selected colour is detected. Keep the tab open and allow camera access.</div>
+</div>
 
 <div class="panel" id="bodyPanel">
 <strong>JARVESH BODY DETECTION AI</strong>
@@ -234,7 +291,9 @@ const cmds=[
 ['IMAGE READER','image reader'],
 ['STUDY MODE','study mode'],
 ['3D AVATAR','avatar'],
-['WEB SEARCH','search latest AI news']
+['WEB SEARCH','search latest AI news'],
+['COLOUR DETECTOR','colour detect'],
+['STOP COLOUR AI','stop colour detection']
 ];
 
 cmds.forEach(([label,cmd])=>{
@@ -822,12 +881,212 @@ window.open('https://www.google.com/search?q='+encodeURIComponent(q),'_blank','n
 add('jarvesh','Opening web search for: '+q);
 }
 
+// COLOUR DETECTOR - CHOOSE A PRESET OR ANY CUSTOM COLOUR
+const colourValues={
+red:'#ff0000',orange:'#ff8800',yellow:'#ffff00',lime:'#aaff00',
+green:'#00cc44',cyan:'#00ffff',blue:'#0066ff',navy:'#000080',
+purple:'#8000ff',magenta:'#ff00ff',pink:'#ff69b4',brown:'#8b4513',
+white:'#ffffff',grey:'#808080',black:'#000000'
+};
+let selectedColourName='red';
+let selectedColourHex='#ff0000';
+let colorStream=null;
+let colorRunning=false;
+let colorFrame=null;
+let colorAudio=null;
+let sirenTimer=null;
+let sirenOn=false;
+let lastColorAlert=0;
+
+function openColorPicker(){
+  hideFeaturePanels();
+  document.getElementById('colorSelectPanel').style.display='block';
+  applyColorPreset();
+  add('jarvesh','choose a colour and press start fullscreen camera');
+}
+function closeColorPicker(){
+  document.getElementById('colorSelectPanel').style.display='none';
+}
+function applyColorPreset(){
+  const preset=document.getElementById('colorPreset').value;
+  if(preset==='custom'){
+    chooseCustomColor();
+    return;
+  }
+  selectedColourName=preset;
+  selectedColourHex=colourValues[preset]||'#ff0000';
+  document.getElementById('customColor').value=selectedColourHex;
+}
+function chooseCustomColor(){
+  selectedColourHex=document.getElementById('customColor').value.toLowerCase();
+  selectedColourName='custom';
+  document.getElementById('colorPreset').value='custom';
+}
+function hexToRgb(hex){
+  const value=hex.replace('#','');
+  return {r:parseInt(value.slice(0,2),16),g:parseInt(value.slice(2,4),16),b:parseInt(value.slice(4,6),16)};
+}
+function rgbToHsv(r,g,b){
+  r/=255;g/=255;b/=255;
+  const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;
+  let h=0,s=max===0?0:d/max,v=max;
+  if(d!==0){
+    if(max===r)h=((g-b)/d)%6;
+    else if(max===g)h=(b-r)/d+2;
+    else h=(r-g)/d+4;
+    h*=60;if(h<0)h+=360;
+  }
+  return {h,s:s*100,v:v*100};
+}
+function startSiren(){
+  if(sirenOn)return;
+  sirenOn=true;
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return;
+    colorAudio=new AC();
+    if(colorAudio.state==='suspended')colorAudio.resume();
+    let high=false;
+    sirenTimer=setInterval(()=>{
+      if(!colorAudio||colorAudio.state==='closed')return;
+      const osc=colorAudio.createOscillator();
+      const gain=colorAudio.createGain();
+      osc.type='sine';
+      osc.frequency.value=high?1050:720;
+      gain.gain.setValueAtTime(0.0001,colorAudio.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.12,colorAudio.currentTime+0.025);
+      gain.gain.setValueAtTime(0.12,colorAudio.currentTime+0.13);
+      gain.gain.exponentialRampToValueAtTime(0.0001,colorAudio.currentTime+0.2);
+      osc.connect(gain);gain.connect(colorAudio.destination);
+      osc.start();osc.stop(colorAudio.currentTime+0.21);
+      high=!high;
+    },240);
+  }catch(e){console.warn('Siren audio unavailable',e);}
+}
+function stopSiren(){
+  sirenOn=false;
+  if(sirenTimer){clearInterval(sirenTimer);sirenTimer=null;}
+  if(colorAudio){
+    colorAudio.close().catch(()=>{});
+    colorAudio=null;
+  }
+}
+function colorMatches(r,g,b,target){
+  const t=rgbToHsv(target.r,target.g,target.b);
+  const p=rgbToHsv(r,g,b);
+  const name=selectedColourName;
+  if(name==='white')return p.v>78&&p.s<25;
+  if(name==='black')return p.v<23;
+  if(name==='grey')return p.v>=23&&p.v<=72&&p.s<22;
+  if(name==='brown')return p.h>=8&&p.h<=42&&p.s>28&&p.v<62;
+  let dh=Math.abs(p.h-t.h);dh=Math.min(dh,360-dh);
+  const hueTolerance=(name==='custom'?17:22);
+  return dh<=hueTolerance&&p.s>=Math.max(22,t.s*0.35)&&p.v>=Math.max(18,t.v*0.25);
+}
+async function startColorDetection(){
+  if(colorRunning)return;
+  const video=document.getElementById('colorVideo');
+  const overlay=document.getElementById('colorFullscreen');
+  closeColorPicker();
+  document.getElementById('colorSelectedLabel').textContent='Selected colour: '+selectedColourName+' ('+selectedColourHex+')';
+  document.getElementById('colorSwatch').style.background=selectedColourHex;
+  document.getElementById('colorStatus').textContent='Requesting camera...';
+  overlay.classList.add('active');
+  try{
+    colorStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+    video.srcObject=colorStream;
+    await video.play();
+    colorRunning=true;
+    document.getElementById('colorStatus').textContent='Scanning for '+selectedColourName+'...';
+    add('jarvesh','fullscreen colour detector started for '+selectedColourName);
+    detectChosenColour();
+  }catch(error){
+    console.error(error);
+    stopColorDetection();
+    add('jarvesh','could not start colour camera. allow camera permission and try again');
+  }
+}
+function detectChosenColour(){
+  if(!colorRunning)return;
+  const video=document.getElementById('colorVideo');
+  const canvas=document.getElementById('colorCanvas');
+  if(video.readyState>=2&&video.videoWidth){
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    const w=320,h=Math.max(180,Math.round(320*video.videoHeight/video.videoWidth));
+    canvas.width=w;canvas.height=h;
+    const sample=document.createElement('canvas');
+    sample.width=w;sample.height=h;
+    const sctx=sample.getContext('2d',{willReadFrequently:true});
+    sctx.drawImage(video,0,0,w,h);
+    const image=sctx.getImageData(0,0,w,h);
+    const target=hexToRgb(selectedColourHex);
+    let minX=w,minY=h,maxX=-1,maxY=-1,count=0;
+    // Sample every second pixel for responsive detection on ordinary laptops.
+    for(let y=0;y<h;y+=2){
+      for(let x=0;x<w;x+=2){
+        const i=(y*w+x)*4;
+        if(colorMatches(image.data[i],image.data[i+1],image.data[i+2],target)){
+          minX=Math.min(minX,x);minY=Math.min(minY,y);
+          maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
+          count++;
+        }
+      }
+    }
+    ctx.clearRect(0,0,w,h);
+    const enough=count>Math.max(35,(w*h)*0.00035);
+    if(enough&&maxX>minX&&maxY>minY){
+      ctx.strokeStyle='#39ff88';ctx.lineWidth=4;
+      ctx.strokeRect(minX,minY,maxX-minX,maxY-minY);
+      ctx.fillStyle='#39ff88';ctx.font='bold 13px Arial';
+      ctx.fillText(selectedColourName.toUpperCase(),minX,Math.max(15,minY-6));
+      const scaleX=video.videoWidth/w,scaleY=video.videoHeight/h;
+      const box={x:Math.round(minX*scaleX),y:Math.round(minY*scaleY),width:Math.round((maxX-minX)*scaleX),height:Math.round((maxY-minY)*scaleY)};
+      const rgb=hexToRgb(selectedColourHex);
+      document.getElementById('colorReadout').textContent=
+        selectedColourName+' | '+selectedColourHex.toUpperCase()+' | RGB '+rgb.r+', '+rgb.g+', '+rgb.b;
+      document.getElementById('colorStatus').textContent='COLOUR DETECTED - BOX HIGHLIGHTED';
+      startSiren();
+      const now=Date.now();
+      if(now-lastColorAlert>3500){
+        add('jarvesh',selectedColourName+' colour detected. siren alert active.');
+        lastColorAlert=now;
+      }
+    }else{
+      document.getElementById('colorReadout').textContent='Waiting for '+selectedColourName+'...';
+      document.getElementById('colorStatus').textContent='Selected colour not found';
+      stopSiren();
+    }
+  }
+  if(colorRunning)colorFrame=requestAnimationFrame(detectChosenColour);
+}
+function stopColorDetection(){
+  colorRunning=false;
+  if(colorFrame)cancelAnimationFrame(colorFrame);
+  stopSiren();
+  if(colorStream){colorStream.getTracks().forEach(track=>track.stop());colorStream=null;}
+  const video=document.getElementById('colorVideo');
+  if(video){video.pause();video.srcObject=null;}
+  document.getElementById('colorFullscreen').classList.remove('active');
+  document.getElementById('colorSelectPanel').style.display='none';
+  document.getElementById('colorStatus').textContent='Colour detector stopped';
+  add('jarvesh','colour detector and siren stopped');
+}
+
 // COMMAND SYSTEM
 async function run(c){
 c=cleanText(c);
 if(!c)return;
 
 add('you',c);
+
+if(['colour detect','color detect','colour detector','color detector','start colour detection','start color detection'].includes(c)){
+openColorPicker();
+return;
+}
+if(['stop colour detection','stop color detection','stop colour ai','stop color ai'].includes(c)){
+stopColorDetection();
+return;
+}
 
 if(['object detection','start object detection','object ai'].includes(c)){
 await startObjectDetection();
@@ -1054,6 +1313,12 @@ const commandMap={
 'help':'help',
 'tell me a joke':'joke',
 'clear chat':'clear chat',
+'colour detect':'colour detect',
+'color detect':'colour detect',
+'colour detector':'colour detect',
+'color detector':'colour detect',
+'stop colour detection':'stop colour detection',
+'stop color detection':'stop colour detection',
 'object detection':'object detection',
 'start object detection':'object detection',
 'stop object detection':'stop object detection',
