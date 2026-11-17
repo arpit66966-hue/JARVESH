@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -45,7 +44,6 @@ aside small{display:block;color:#9ab0c9}
 .camera-controls button{padding:15px 7px;font-size:14px}
 .camera-controls .muted{line-height:1.5}
 .hidden-source{position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;top:0}
-
 @media(max-width:700px){
 .app{grid-template-columns:1fr;height:96vh}
 .side{display:none}
@@ -58,7 +56,7 @@ aside small{display:block;color:#9ab0c9}
 .camera-controls button{font-size:11px;padding:12px 4px}
 }
 
-/* NEW FEATURES */
+/* NEW JARVESH FEATURES */
 .feature-panel{display:none;padding:14px;background:#091321;border-top:1px solid #29415e;max-height:48vh;overflow:auto}
 .feature-panel h3{margin:3px 0 10px;color:#36b7ff}
 .feature-panel input,.feature-panel textarea{width:100%;padding:11px;background:#101b2b;color:#fff;border:1px solid #35506f;border-radius:8px;margin:7px 0}
@@ -73,12 +71,7 @@ aside small{display:block;color:#9ab0c9}
 .avatar-mouth{position:absolute;width:38px;height:8px;border-radius:0 0 30px 30px;border-bottom:4px solid #7dd3fc;left:53px;top:96px}
 .avatar-panel.talking .avatar-mouth{height:22px;background:#36b7ff33;animation:talk .18s infinite alternate}
 @keyframes talk{from{transform:scaleY(.45)}to{transform:scaleY(1)}}
-@media(max-width:700px){
-.feature-panel{max-height:42vh}
-.avatar-face{width:125px;height:125px}
-.avatar-eyes{top:39px}
-.avatar-mouth{left:42px;top:80px}
-}
+@media(max-width:700px){.feature-panel{max-height:42vh}.avatar-face{width:125px;height:125px}.avatar-eyes{top:39px}.avatar-mouth{left:42px;top:80px}}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
@@ -156,16 +149,12 @@ This is not a complete ISL translator.
 </small>
 </div>
 
-<!-- NEW FEATURE PANELS -->
-
 <div class="feature-panel" id="objectPanel">
 <h3>JARVESH AI OBJECT DETECTION</h3>
 <div class="panelStatus" id="objectStatus">Object detection is off.</div>
 <video id="objectVideo" autoplay playsinline muted></video>
 <canvas id="objectCanvas"></canvas>
-<div class="feature-actions">
-<button class="btn red" onclick="stopObjectDetection()">STOP OBJECT AI</button>
-</div>
+<div class="feature-actions"><button class="btn red" onclick="stopObjectDetection()">STOP OBJECT AI</button></div>
 <div class="feature-result" id="objectResult">Say or type "object detection" to start.</div>
 </div>
 
@@ -173,9 +162,7 @@ This is not a complete ISL translator.
 <h3>JARVESH AI IMAGE READER</h3>
 <p class="muted">Upload a clear image containing printed or handwritten text.</p>
 <input type="file" id="readerFile" accept="image/*">
-<div class="feature-actions">
-<button class="btn" onclick="readUploadedImage()">READ IMAGE</button>
-</div>
+<div class="feature-actions"><button class="btn" onclick="readUploadedImage()">READ IMAGE</button></div>
 <div class="feature-result" id="readerResult">Extracted text will appear here.</div>
 </div>
 
@@ -183,18 +170,12 @@ This is not a complete ISL translator.
 <h3>JARVESH AI STUDY MODE</h3>
 <p class="muted">Ask a school question, request notes, or create a quiz.</p>
 <textarea id="studyQuestion" rows="3" placeholder="Example: Explain photosynthesis in simple Hindi..."></textarea>
-<div class="feature-actions">
-<button class="btn" onclick="askStudyMode()">ASK JARVESH</button>
-<button class="btn red" onclick="hideFeaturePanels()">CLOSE</button>
-</div>
+<div class="feature-actions"><button class="btn" onclick="askStudyMode()">ASK JARVESH</button><button class="btn red" onclick="hideFeaturePanels()">CLOSE</button></div>
 </div>
 
 <div class="avatar-panel" id="avatarPanel">
 <h3 style="color:#36b7ff">JARVESH 3D-STYLE AI AVATAR</h3>
-<div class="avatar-face">
-<div class="avatar-eyes"><span></span><span></span></div>
-<div class="avatar-mouth"></div>
-</div>
+<div class="avatar-face"><div class="avatar-eyes"><span></span><span></span></div><div class="avatar-mouth"></div></div>
 <div class="muted">Your virtual assistant is ready.</div>
 <button class="btn red" style="margin-top:12px" onclick="hideFeaturePanels()">CLOSE AVATAR</button>
 </div>
@@ -223,10 +204,11 @@ return String(value??'')
 .trim();
 }
 
+// BASIC SETTINGS
 const chat=document.getElementById('chat');
 const input=document.getElementById('input');
 
-// COMMAND CENTER
+// COMMANDS
 const cmds=[
 ['HELP','help'],
 ['NAMASTE','namaste'],
@@ -264,3 +246,918 @@ document.getElementById('form').requestSubmit();
 };
 document.getElementById('commands').appendChild(b);
 });
+
+// CHAT AUTO SCROLL
+function scrollChat(){
+requestAnimationFrame(()=>{
+chat.scrollTop=chat.scrollHeight;
+});
+}
+
+function add(who,msg){
+msg=cleanText(msg);
+who=cleanText(who);
+
+let d=document.createElement('div');
+d.className='msg '+(who==='you'?'user':'bot');
+
+let n=document.createElement('div');
+n.className='who';
+n.textContent=who;
+
+let t=document.createElement('div');
+t.textContent=msg;
+
+d.append(n,t);
+chat.appendChild(d);
+
+scrollChat();
+setTimeout(scrollChat,150);
+setTimeout(scrollChat,400);
+}
+
+// VOICE OUTPUT
+let micEnabled=false;
+let micBusy=false;
+let rec=null;
+let restartTimer=null;
+let isSpeaking=false;
+
+function say(msg){
+if(!window.speechSynthesis)return;
+
+isSpeaking=true;
+const avatar=document.getElementById('avatarPanel');
+if(avatar)avatar.classList.add('talking');
+
+if(rec&&micBusy){
+try{rec.stop();}catch(e){}
+}
+
+let u=new SpeechSynthesisUtterance(cleanText(msg));
+u.lang='hi-IN';
+
+let vs=speechSynthesis.getVoices()
+.filter(v=>v.lang.toLowerCase().startsWith('hi'));
+
+let mode=document.getElementById('voice').value;
+
+if(mode==='female'){
+u.voice=vs.find(v=>/female|swara|kalpana/i.test(v.name))||vs[0];
+}else if(mode==='male'){
+u.voice=vs.find(v=>/male|madhur/i.test(v.name))||vs[0];
+}else{
+u.voice=vs[0];
+}
+
+u.onend=()=>{
+isSpeaking=false;
+if(avatar)avatar.classList.remove('talking');
+if(micEnabled)scheduleMicRestart(700);
+};
+
+u.onerror=()=>{
+isSpeaking=false;
+if(avatar)avatar.classList.remove('talking');
+if(micEnabled)scheduleMicRestart(700);
+};
+
+speechSynthesis.cancel();
+speechSynthesis.speak(u);
+}
+
+// FULL SCREEN CAMERA
+let activeCamera=null;
+
+function openFullCamera(videoId,title){
+const source=document.getElementById(videoId);
+const display=document.getElementById('fullCameraVideo');
+
+document.getElementById('cameraTitle').textContent=cleanText(title);
+document.getElementById('cameraFullscreen').classList.add('active');
+
+display.srcObject=source.srcObject;
+display.play().catch(console.error);
+
+activeCamera=videoId;
+document.getElementById('fullCameraStatus').textContent='camera on';
+}
+
+function updateLiveCamera(text,description){
+document.getElementById('liveGestureText').textContent=cleanText(text);
+document.getElementById('liveDescription').textContent=cleanText(description);
+}
+
+function closeFullCamera(){
+const overlay=document.getElementById('cameraFullscreen');
+const display=document.getElementById('fullCameraVideo');
+
+overlay.classList.remove('active');
+display.pause();
+display.srcObject=null;
+activeCamera=null;
+}
+
+function stopActiveCamera(){
+if(activeCamera==='bodyVideo'){
+stopBody();
+add('jarvesh','body camera stopped');
+}else if(activeCamera==='handVideo'){
+stopHand();
+add('jarvesh','hand ai camera stopped');
+}else{
+closeFullCamera();
+}
+}
+
+// BODY DETECTION AI
+let bodyCamera=null;
+let poseModel=null;
+let bodyRunning=false;
+let bodyStream=null;
+
+async function startBody(){
+if(bodyRunning)return;
+
+document.getElementById('bodyPanel').style.display='block';
+document.getElementById('bodyStatus').textContent='requesting camera permission';
+
+try{
+const video=document.getElementById('bodyVideo');
+
+bodyStream=await navigator.mediaDevices.getUserMedia({
+video:true,audio:false
+});
+
+video.srcObject=bodyStream;
+await video.play();
+
+bodyRunning=true;
+
+poseModel=new Pose({
+locateFile:file=>'https://cdn.jsdelivr.net/npm/@mediapipe/pose/'+file
+});
+
+poseModel.setOptions({
+modelComplexity:1,
+smoothLandmarks:true,
+enableSegmentation:false,
+minDetectionConfidence:0.6,
+minTrackingConfidence:0.6
+});
+
+poseModel.onResults(results=>{
+if(!bodyRunning)return;
+
+if(results.poseLandmarks){
+document.getElementById('bodyStatus').textContent='body detected - landmarks visible';
+updateLiveCamera('body detected','body landmarks successfully detected');
+}else{
+document.getElementById('bodyStatus').textContent='body not detected';
+updateLiveCamera('body not detected','position yourself in front of the camera');
+}
+});
+
+bodyCamera=new Camera(video,{
+onFrame:async()=>{
+if(bodyRunning&&poseModel){
+await poseModel.send({image:video});
+}
+},
+width:640,
+height:480
+});
+
+bodyCamera.start();
+
+openFullCamera('bodyVideo','JARVESH BODY DETECTION AI');
+
+add('jarvesh','body detection camera started');
+say('body detection camera started');
+
+}catch(error){
+console.error(error);
+stopBody();
+add('jarvesh','camera could not start check camera permission');
+}
+}
+
+function stopBody(){
+bodyRunning=false;
+
+if(bodyCamera){
+bodyCamera.stop();
+bodyCamera=null;
+}
+
+if(poseModel){
+poseModel.close();
+poseModel=null;
+}
+
+if(bodyStream){
+bodyStream.getTracks().forEach(t=>t.stop());
+bodyStream=null;
+}
+
+let video=document.getElementById('bodyVideo');
+
+if(video.srcObject){
+video.srcObject.getTracks().forEach(t=>t.stop());
+video.srcObject=null;
+}
+
+document.getElementById('bodyPanel').style.display='none';
+closeFullCamera();
+}
+
+// HAND GESTURE AI
+let handCamera=null;
+let handModel=null;
+let handRunning=false;
+let handMode='basic';
+let lastHandLabel='';
+let lastHandTime=0;
+let signText='';
+let handStream=null;
+
+function updateSignOutput(){
+document.getElementById('signOutput').textContent=
+cleanText(signText||'no gesture detected yet');
+}
+
+async function startHand(mode){
+if(handRunning)stopHand();
+
+handMode=mode;
+lastHandLabel='';
+lastHandTime=0;
+
+document.getElementById('handPanel').style.display='block';
+document.getElementById('handStatus').textContent='loading ai model';
+
+try{
+const video=document.getElementById('handVideo');
+
+handStream=await navigator.mediaDevices.getUserMedia({
+video:{facingMode:'user'},audio:false
+});
+
+video.srcObject=handStream;
+await video.play();
+
+const mp=await import(
+'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs'
+);
+
+const vision=await mp.FilesetResolver.forVisionTasks(
+'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+);
+
+handModel=await mp.GestureRecognizer.createFromOptions(vision,{
+baseOptions:{
+modelAssetPath:'https://storage.googleapis.com/mediapipe-tasks/gesture_recognizer/gesture_recognizer.task'
+},
+runningMode:'VIDEO',
+numHands:1
+});
+
+handRunning=true;
+
+handCamera=new Camera(video,{
+onFrame:async()=>{
+if(handRunning&&handModel&&video.readyState>=2){
+try{
+const result=handModel.recognizeForVideo(video,performance.now());
+onHandResults(result);
+}catch(error){
+console.error('gesture recognition error:',error);
+}
+}
+},
+width:640,
+height:480
+});
+
+handCamera.start();
+
+openFullCamera('handVideo','JARVESH AI GESTURE RECOGNIZER');
+
+updateLiveCamera('waiting for hand','bring your hand in front of the camera');
+
+document.getElementById('handStatus').textContent='pretrained ai gesture model on';
+add('jarvesh','ai hand gesture camera started');
+
+}catch(error){
+console.error(error);
+stopHand();
+add('jarvesh','ai model could not load check internet and camera permission');
+}
+}
+
+function onHandResults(result){
+if(!handRunning)return;
+
+const gesture=result.gestures?.[0]?.[0];
+
+if(!gesture||gesture.categoryName==='None'||gesture.score<0.55){
+document.getElementById('handStatus').textContent='no clear gesture detected';
+updateLiveCamera('gesture not detected','show your hand clearly');
+lastHandLabel='';
+return;
+}
+
+const names={
+'Open_Palm':'open palm',
+'Closed_Fist':'closed fist',
+'Pointing_Up':'pointing up',
+'Thumb_Up':'thumbs up',
+'Thumb_Down':'thumbs down',
+'Victory':'victory peace',
+'ILoveYou':'i love you'
+};
+
+const label=cleanText(names[gesture.categoryName]||gesture.categoryName);
+
+document.getElementById('handStatus').textContent=
+'detected: '+label+' ('+Math.round(gesture.score*100)+'%)';
+
+updateLiveCamera('detected: '+label,'ai confidence: '+Math.round(gesture.score*100)+'%');
+
+const now=Date.now();
+
+if(label===lastHandLabel&&now-lastHandTime<1800)return;
+if(now-lastHandTime<1000)return;
+
+lastHandLabel=label;
+lastHandTime=now;
+
+if(handMode==='basic'){
+const message='your hand gesture: '+label;
+document.getElementById('signOutput').textContent=cleanText(message);
+add('jarvesh',message);
+say(message);
+}else{
+signText+=(label+' ').toLowerCase();
+updateSignOutput();
+add('jarvesh','recognized gesture: '+label);
+}
+}
+
+function stopHand(){
+handRunning=false;
+
+if(handCamera){
+handCamera.stop();
+handCamera=null;
+}
+
+if(handModel){
+handModel.close();
+handModel=null;
+}
+
+if(handStream){
+handStream.getTracks().forEach(t=>t.stop());
+handStream=null;
+}
+
+const video=document.getElementById('handVideo');
+
+if(video.srcObject){
+video.srcObject.getTracks().forEach(t=>t.stop());
+video.srcObject=null;
+}
+
+document.getElementById('handPanel').style.display='none';
+document.getElementById('handStatus').textContent='camera stopped';
+closeFullCamera();
+}
+
+// SIGN TEXT CONTROLS
+function addSignSpace(){
+signText+=' ';
+updateSignOutput();
+}
+
+function deleteSignLetter(){
+signText=signText.slice(0,-1);
+updateSignOutput();
+}
+
+function clearSignText(){
+signText='';
+updateSignOutput();
+}
+
+function speakSignText(){
+if(signText.trim())say(signText);
+else say('there is no text yet');
+}
+
+// NEW FEATURES - COMMAND ACTIVATED ONLY
+function hideFeaturePanels(){
+['objectPanel','imagePanel','studyPanel','avatarPanel'].forEach(id=>{
+document.getElementById(id).style.display='none';
+});
+}
+
+function showFeaturePanel(id){
+hideFeaturePanels();
+document.getElementById(id).style.display='block';
+}
+
+let objectStream=null;
+let objectModel=null;
+let objectRunning=false;
+let objectFrame=null;
+
+async function startObjectDetection(){
+if(objectRunning)return;
+showFeaturePanel('objectPanel');
+const video=document.getElementById('objectVideo');
+const status=document.getElementById('objectStatus');
+status.textContent='Loading AI model and camera...';
+
+try{
+if(!window.cocoSsd)throw new Error('Object detection library did not load');
+
+objectStream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+video.srcObject=objectStream;
+await video.play();
+
+objectModel=await cocoSsd.load();
+objectRunning=true;
+status.textContent='AI object detection is running.';
+add('jarvesh','object detection started');
+detectObjectsLoop();
+
+}catch(error){
+console.error(error);
+stopObjectDetection();
+status.textContent='Could not start. Check internet and camera permission.';
+add('jarvesh','object detection could not start. Check camera permission and internet.');
+}
+}
+
+async function detectObjectsLoop(){
+if(!objectRunning||!objectModel)return;
+
+const video=document.getElementById('objectVideo');
+const canvas=document.getElementById('objectCanvas');
+
+if(video.readyState>=2){
+try{
+const predictions=await objectModel.detect(video);
+const ctx=canvas.getContext('2d');
+
+canvas.width=video.videoWidth;
+canvas.height=video.videoHeight;
+
+ctx.clearRect(0,0,canvas.width,canvas.height);
+ctx.drawImage(video,0,0,canvas.width,canvas.height);
+
+const found=[];
+
+predictions.forEach(item=>{
+if(item.score<0.55)return;
+
+ctx.strokeStyle='#36b7ff';
+ctx.lineWidth=3;
+ctx.strokeRect(...item.bbox);
+
+ctx.fillStyle='#36b7ff';
+ctx.font='16px Arial';
+ctx.fillText(item.class+' '+Math.round(item.score*100)+'%',item.bbox[0],Math.max(18,item.bbox[1]-5));
+
+found.push(item.class+' ('+Math.round(item.score*100)+'%)');
+});
+
+document.getElementById('objectResult').textContent=
+found.length?'Detected: '+[...new Set(found)].join(', '):'No clear object detected.';
+
+}catch(error){
+console.error(error);
+}
+}
+
+if(objectRunning)objectFrame=requestAnimationFrame(detectObjectsLoop);
+}
+
+function stopObjectDetection(){
+objectRunning=false;
+
+if(objectFrame)cancelAnimationFrame(objectFrame);
+
+if(objectStream){
+objectStream.getTracks().forEach(track=>track.stop());
+objectStream=null;
+}
+
+const video=document.getElementById('objectVideo');
+if(video)video.srcObject=null;
+
+objectModel=null;
+
+const panel=document.getElementById('objectPanel');
+if(panel)panel.style.display='none';
+
+const status=document.getElementById('objectStatus');
+if(status)status.textContent='Object detection is off.';
+}
+
+async function readUploadedImage(){
+const file=document.getElementById('readerFile').files[0];
+const output=document.getElementById('readerResult');
+
+if(!file){
+output.textContent='Please select an image first.';
+return;
+}
+
+if(!window.Tesseract){
+output.textContent='Text reader library did not load. Check internet.';
+return;
+}
+
+output.textContent='Reading image... please wait.';
+
+try{
+const result=await Tesseract.recognize(file,'eng');
+const text=result.data.text.trim();
+
+output.textContent=text||'No readable text found in this image.';
+
+if(text)add('jarvesh','Image text: '+text);
+
+}catch(error){
+console.error(error);
+output.textContent='Could not read this image. Try a clearer photo.';
+}
+}
+
+async function askStudyMode(){
+const question=document.getElementById('studyQuestion').value.trim();
+
+if(!question){
+add('jarvesh','Please type a question for Study Mode.');
+return;
+}
+
+document.getElementById('studyQuestion').value='';
+hideFeaturePanels();
+
+await run('study mode: '+question);
+}
+
+function openSmartSearch(query){
+const q=String(query||'').trim();
+
+if(!q){
+add('jarvesh','Tell me what you want to search. Example: search photosynthesis');
+return;
+}
+
+window.open('https://www.google.com/search?q='+encodeURIComponent(q),'_blank','noopener');
+add('jarvesh','Opening web search for: '+q);
+}
+
+// COMMAND SYSTEM
+async function run(c){
+c=cleanText(c);
+if(!c)return;
+
+add('you',c);
+
+if(['object detection','start object detection','object ai'].includes(c)){
+await startObjectDetection();
+return;
+}
+
+if(['stop object detection','stop object ai'].includes(c)){
+stopObjectDetection();
+add('jarvesh','object detection stopped');
+return;
+}
+
+if(['image reader','read image','image text reader'].includes(c)){
+showFeaturePanel('imagePanel');
+add('jarvesh','image reader is ready. Upload a photo and press read image.');
+return;
+}
+
+if(['study mode','open study mode'].includes(c)){
+showFeaturePanel('studyPanel');
+add('jarvesh','study mode is ready. Type your question in the study panel.');
+return;
+}
+
+if(['avatar','3d avatar','show avatar','open avatar'].includes(c)){
+showFeaturePanel('avatarPanel');
+add('jarvesh','your assistant avatar is ready.');
+return;
+}
+
+if(c.startsWith('search ')){
+openSmartSearch(c.slice(7));
+return;
+}
+
+if(['body language','body','body detection'].includes(c)){
+say('starting body detection');
+await startBody();
+return;
+}
+
+if(['stop body','stop body language','camera band'].includes(c)){
+stopBody();
+add('jarvesh','body camera stopped');
+say('camera stopped');
+return;
+}
+
+if(['hand gesture','basic gesture'].includes(c)){
+await startHand('basic');
+return;
+}
+
+if(['sign language','sign to text'].includes(c)){
+await startHand('sign');
+return;
+}
+
+if(['stop hand','stop hand gesture','stop sign'].includes(c)){
+stopHand();
+add('jarvesh','hand ai camera stopped');
+say('hand camera stopped');
+return;
+}
+
+try{
+let r=await fetch('/api/command',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({command:c})
+});
+
+if(!r.ok)throw new Error('server error');
+
+let data=await r.json();
+let x=data.reply;
+
+if(typeof x!=='string'){
+x='the server returned an invalid response';
+}
+
+if(x.startsWith('OPEN_URL:')){
+window.open(x.slice(9),'_blank','noopener');
+x='opening the website in your browser';
+}
+
+else if(x.startsWith('SAVE_MEMORY:')){
+let a=JSON.parse(localStorage.getItem('jmemory')||'[]');
+a.push(cleanText(x.slice(12)));
+localStorage.setItem('jmemory',JSON.stringify(a));
+x='saved this information in this browser';
+}
+
+else if(x==='GET_MEMORY'){
+let a=JSON.parse(localStorage.getItem('jmemory')||'[]');
+x=a.length?'your saved information: '+a.join(' | '):'no saved information yet';
+}
+
+else if(x.startsWith('SET_ALARM:')){
+let m=Number(x.split(':')[1]);
+
+if(Number.isFinite(m)&&m>0){
+x='your alarm is set for '+m+' minutes keep this page open';
+
+setTimeout(()=>{
+add('jarvesh','your alarm is ringing');
+say('your alarm is ringing');
+},m*60000);
+
+}else{
+x='invalid alarm time';
+}
+}
+
+else if(x==='CLEAR_CHAT'){
+chat.innerHTML='';
+x='chat cleared';
+}
+
+x=cleanText(x);
+add('jarvesh',x);
+say(x);
+
+}catch(error){
+console.error(error);
+add('jarvesh','could not connect to the server please try again');
+}
+}
+
+// SEND MESSAGE
+document.getElementById('form').onsubmit=e=>{
+e.preventDefault();
+
+let c=cleanText(input.value);
+
+if(c){
+input.value='';
+run(c);
+}
+};
+
+// HINDI TO ENGLISH TRANSLATION
+async function translateToEnglish(text){
+text=String(text).trim();
+
+const hasHindi=/[\u0900-\u097F]/.test(text);
+
+if(!hasHindi){
+return cleanText(text);
+}
+
+const url='https://api.mymemory.translated.net/get?q='+
+encodeURIComponent(text)+'&langpair=hi|en';
+
+const response=await fetch(url);
+
+if(!response.ok){
+throw new Error('translation service unavailable');
+}
+
+const data=await response.json();
+const translated=data?.responseData?.translatedText;
+
+if(!translated){
+throw new Error('translation failed');
+}
+
+return cleanText(translated);
+}
+
+// CONTINUOUS MICROPHONE
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+
+function scheduleMicRestart(delay=800){
+clearTimeout(restartTimer);
+
+if(!micEnabled||isSpeaking)return;
+
+restartTimer=setTimeout(()=>{
+if(micEnabled&&!micBusy&&!isSpeaking){
+createRecognition();
+}
+},delay);
+}
+
+function createRecognition(){
+if(!SR||!micEnabled||micBusy||isSpeaking)return;
+
+rec=new SR();
+rec.lang='hi-IN';
+rec.interimResults=false;
+rec.maxAlternatives=1;
+
+rec.onstart=()=>{
+micBusy=true;
+document.getElementById('status').textContent='● LISTENING';
+document.getElementById('mic').textContent='STOP MIC';
+};
+
+rec.onresult=async e=>{
+const spoken=String(e.results[0][0].transcript||'').trim();
+
+if(!spoken)return;
+
+document.getElementById('status').textContent='● TRANSLATING';
+
+try{
+const english=cleanText(await translateToEnglish(spoken));
+
+const commandMap={
+'open youtube':'open youtube',
+'open you tube':'open youtube',
+'youtube kholo':'open youtube',
+'open google':'open google',
+'google kholo':'open google',
+'open github':'open github',
+'open chatgpt':'open chatgpt',
+'open chat gpt':'open chatgpt',
+'body language':'body language',
+'hand gesture':'hand gesture',
+'sign language':'sign language',
+'stop body':'stop body',
+'stop hand':'stop hand',
+'help':'help',
+'tell me a joke':'joke',
+'clear chat':'clear chat',
+'object detection':'object detection',
+'start object detection':'object detection',
+'stop object detection':'stop object detection',
+'image reader':'image reader',
+'read image':'image reader',
+'study mode':'study mode',
+'open study mode':'study mode',
+'avatar':'avatar',
+'show avatar':'avatar'
+};
+
+const finalMessage=cleanText(commandMap[english]||english);
+
+input.value=finalMessage;
+document.getElementById('status').textContent='● ONLINE';
+document.getElementById('form').requestSubmit();
+
+}catch(error){
+console.error('translation error:',error);
+document.getElementById('status').textContent='● ONLINE';
+add('jarvesh','translation failed check your internet connection and try again');
+}
+};
+
+rec.onerror=e=>{
+console.error('microphone error:',e.error);
+document.getElementById('status').textContent='● MIC ERROR';
+};
+
+rec.onend=()=>{
+micBusy=false;
+
+if(micEnabled&&!isSpeaking){
+document.getElementById('status').textContent='● RESTARTING MIC';
+scheduleMicRestart(900);
+}else if(!micEnabled){
+document.getElementById('status').textContent='● ONLINE';
+}
+};
+
+try{
+rec.start();
+}catch(error){
+micBusy=false;
+console.error(error);
+scheduleMicRestart(1500);
+}
+}
+
+async function startMic(){
+if(!SR){
+add('jarvesh','voice recognition is not supported please use google chrome or microsoft edge');
+return;
+}
+
+if(micEnabled)return;
+
+micEnabled=true;
+document.getElementById('mic').textContent='STOP MIC';
+
+try{
+const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+stream.getTracks().forEach(track=>track.stop());
+createRecognition();
+
+}catch(error){
+micEnabled=false;
+document.getElementById('mic').textContent='START MIC';
+document.getElementById('status').textContent='● MIC PERMISSION NEEDED';
+add('jarvesh','please allow microphone permission then click start mic');
+}
+}
+
+function stopMic(){
+micEnabled=false;
+clearTimeout(restartTimer);
+
+if(rec){
+const old=rec;
+rec=null;
+try{old.stop();}catch(e){}
+}
+
+micBusy=false;
+document.getElementById('status').textContent='● ONLINE';
+document.getElementById('mic').textContent='START MIC';
+}
+
+document.getElementById('mic').onclick=()=>{
+if(micEnabled)stopMic();
+else startMic();
+};
+
+// AUTO START MICROPHONE
+window.addEventListener('load',()=>{
+setTimeout(()=>{
+if(SR){
+startMic();
+}
+},1200);
+});
+
+// INITIAL SETUP
+scrollChat();
+</script>
+</body>
+</html>
