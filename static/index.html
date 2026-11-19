@@ -44,10 +44,15 @@ aside small{display:block;color:#9ab0c9}
 .camera-controls button{padding:15px 7px;font-size:14px}
 .camera-controls .muted{line-height:1.5}
 .hidden-source{position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;top:0}
+.mobile-command-btn{display:none;background:#14243a;color:#7dd3fc;border:1px solid #36b7ff;border-radius:8px;padding:9px 11px;font-weight:bold;cursor:pointer;white-space:nowrap}
+
 @media(max-width:700px){
-.app{grid-template-columns:1fr;height:96vh}
-.side{display:none}
-.top{padding:12px}
+.app{grid-template-columns:1fr;height:96vh;min-height:0;position:relative}
+.mobile-command-btn{display:inline-flex;align-items:center;justify-content:center}
+.side{display:none;position:fixed;z-index:100001;top:76px;right:10px;width:min(300px,calc(100vw - 20px));height:calc(100dvh - 90px);max-height:600px;border:1px solid #36b7ff;border-radius:12px;box-shadow:0 12px 35px #000b;padding:15px}
+.side.mobile-open{display:block;overflow-y:auto}
+.top{padding:12px;gap:8px}
+.brand{font-size:20px}
 .bar{padding:8px}
 .camera-fullscreen{grid-template-columns:minmax(0,1fr) 90px;padding:8px;gap:7px}
 .camera-title{font-size:16px}
@@ -138,6 +143,7 @@ aside small{display:block;color:#9ab0c9}
 <div class="brand">JARVESH</div>
 <div class="muted">PERSONAL AI ASSISTANT · WEB EDITION</div>
 </div>
+<button type="button" class="mobile-command-btn" id="mobileCommandToggle" aria-controls="commandSidebar" aria-expanded="false" onclick="toggleCommandCenter()">☰ COMMANDS</button>
 <div>
 <span id="status" class="muted">● ONLINE</span><br>
 <select id="voice">
@@ -244,7 +250,7 @@ This is not a complete ISL translator.
 </form>
 </main>
 
-<aside class="side">
+<aside class="side" id="commandSidebar">
 <h3>COMMAND CENTER</h3>
 <div id="commands"></div>
 <h3>IMPORTANT</h3>
@@ -301,9 +307,23 @@ let b=document.createElement('button');
 b.innerHTML=label+'<small>'+cmd+'</small>';
 b.onclick=()=>{
 input.value=cleanText(cmd);
+toggleCommandCenter(true);
 document.getElementById('form').requestSubmit();
 };
 document.getElementById('commands').appendChild(b);
+});
+
+// MOBILE COMMAND CENTER MENU
+function toggleCommandCenter(forceClose=false){
+ const panel=document.getElementById('commandSidebar');
+ const toggle=document.getElementById('mobileCommandToggle');
+ if(!panel||!toggle)return;
+ const shouldOpen=forceClose?false:!panel.classList.contains('mobile-open');
+ panel.classList.toggle('mobile-open',shouldOpen);
+ toggle.setAttribute('aria-expanded',String(shouldOpen));
+}
+window.addEventListener('resize',()=>{
+ if(window.innerWidth>700)toggleCommandCenter(true);
 });
 
 // CHAT AUTO SCROLL
