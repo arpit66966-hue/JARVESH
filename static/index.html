@@ -98,6 +98,7 @@ aside small{display:block;color:#9ab0c9}
 .plant-panel h3{color:#36b7ff;margin:3px 0 10px}
 .plant-panel input[type=file]{width:100%;padding:10px;background:#101b2b;color:#fff;border:1px solid #35506f;border-radius:8px;margin:8px 0}
 .plant-preview{display:none;max-width:100%;max-height:260px;object-fit:contain;border-radius:8px;margin:8px 0}
+#plantCameraVideo{display:none;width:100%;max-height:300px;background:#000;object-fit:contain;border-radius:8px;margin:8px 0}
 .plant-marked{display:none;width:100%;max-height:420px;object-fit:contain;background:#000;border-radius:8px;margin:10px 0}
 .plant-report{white-space:pre-wrap;overflow-wrap:anywhere;background:#14243a;border:1px solid #29415e;padding:11px;border-radius:8px;margin-top:8px;min-height:40px}
 
@@ -249,6 +250,8 @@ This is not a complete ISL translator.
 <div class="plant-panel" id="plantPanel">
 <h3>JARVESH PLANT DOCTOR</h3>
 <p class="muted">Plant photo upload karein. Scanner visible yellow/brown areas ko mark karke observation report banayega.</p>
+<div class="feature-actions"><button class="btn" onclick="startPlantCamera()">OPEN CAMERA</button><button class="btn" onclick="capturePlantCamera()">CAPTURE & SCAN</button><button class="btn red" onclick="stopPlantCamera()">STOP CAMERA</button></div>
+<video id="plantCameraVideo" autoplay playsinline muted></video><canvas id="plantCameraCanvas" style="display:none"></canvas>
 <input type="file" id="plantFile" accept="image/*" capture="environment" onchange="previewPlantImage()">
 <img id="plantPreview" class="plant-preview" alt="Plant photo preview">
 <div class="feature-actions">
@@ -761,7 +764,27 @@ else say('there is no text yet');
 }
 
 
-// PLANT DOCTOR - PHOTO UPLOAD SCAN
+// PLANT DOCTOR - CAMERA + PHOTO SCAN
+let plantCameraStream=null;
+let plantScanFile=null;
+async function startPlantCamera(){
+  try{
+    stopPlantCamera();
+    plantCameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+    const video=document.getElementById("plantCameraVideo");video.srcObject=plantCameraStream;video.style.display="block";
+    document.getElementById("plantReport").textContent="Camera ready. Plant ko frame mein rakhein, phir CAPTURE & SCAN dabayein.";
+    say("Plant camera ready. Place the plant in view and press capture and scan.");
+  }catch(e){document.getElementById("plantReport").textContent="Camera open nahi hua. Browser camera permission allow karein aur HTTPS par kholein.";say("Camera could not start. Please allow camera permission.");}
+}
+function stopPlantCamera(){if(plantCameraStream){plantCameraStream.getTracks().forEach(t=>t.stop());plantCameraStream=null;}const v=document.getElementById("plantCameraVideo");if(v){v.srcObject=null;v.style.display="none";}}
+async function capturePlantCamera(){
+ const v=document.getElementById("plantCameraVideo");if(!plantCameraStream||!v.videoWidth){document.getElementById("plantReport").textContent="Pehle OPEN CAMERA dabayein.";return;}
+ const c=document.getElementById("plantCameraCanvas");c.width=v.videoWidth;c.height=v.videoHeight;c.getContext("2d").drawImage(v,0,0);
+ const blob=await new Promise(resolve=>c.toBlob(resolve,"image/jpeg",0.9));if(!blob){say("Photo capture failed.");return;}
+ plantScanFile=new File([blob],"plant-camera.jpg",{type:"image/jpeg"});
+ const preview=document.getElementById("plantPreview");preview.src=URL.createObjectURL(blob);preview.style.display="block";
+ document.getElementById("plantReport").textContent="Photo captured. Starting scan.";stopPlantCamera();await scanPlant();
+}
 function openPlantDoctor(){
   hideFeaturePanels();
   document.getElementById('plantPanel').style.display='block';
@@ -769,10 +792,12 @@ function openPlantDoctor(){
   add('jarvesh','Plant Doctor ready. Upload or take a plant photo, then press Scan Plant.');
 }
 function closePlantDoctor(){
+  stopPlantCamera();
   document.getElementById('plantPanel').style.display='none';
 }
 function previewPlantImage(){
   const file=document.getElementById('plantFile').files[0];
+  plantScanFile=file||null;
   const preview=document.getElementById('plantPreview');
   const marked=document.getElementById('plantMarked');
   if(!file){preview.style.display='none';return;}
@@ -783,7 +808,7 @@ function previewPlantImage(){
   document.getElementById('plantReport').textContent='Photo selected. Press SCAN PLANT.';
 }
 async function scanPlant(){
-  const file=document.getElementById('plantFile').files[0];
+  const file=plantScanFile||document.getElementById('plantFile').files[0];
   const report=document.getElementById('plantReport');
   const marked=document.getElementById('plantMarked');
   if(!file){report.textContent='Please upload or take a plant photo first.';return;}
@@ -798,9 +823,11 @@ async function scanPlant(){
     report.textContent=data.report||'Scan completed, but no report was returned.';
     if(data.marked_image){marked.src=data.marked_image;marked.style.display='block';}
     add('jarvesh','Plant scan completed. Review the visual observations and care suggestions.');
+    say(report.textContent);
   }catch(error){
     console.error(error);
-    report.textContent='Plant scan could not be completed. Check that the backend endpoint /api/plant-scan is available and try again.';
+    report.textContent='Plant scan could not be completed: backend /api/plant-scan unavailable or server error. Backend must be running.';
+    say('Plant scan failed. The backend server is not responding.');
   }
 }
 function speakPlantReport(){
