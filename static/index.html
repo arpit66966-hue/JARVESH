@@ -92,6 +92,15 @@ aside small{display:block;color:#9ab0c9}
 .color-bottom{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;background:#14243a;border:1px solid #29415e;border-radius:10px;padding:10px}
 .color-swatch{width:30px;height:30px;border:2px solid white;border-radius:7px;display:inline-block;vertical-align:middle}
 .color-status{color:#7dd3fc;font-weight:bold}
+
+/* PLANT DOCTOR */
+.plant-panel{display:none;padding:14px;background:#091321;border-top:1px solid #29415e;max-height:48vh;overflow:auto}
+.plant-panel h3{color:#36b7ff;margin:3px 0 10px}
+.plant-panel input[type=file]{width:100%;padding:10px;background:#101b2b;color:#fff;border:1px solid #35506f;border-radius:8px;margin:8px 0}
+.plant-preview{display:none;max-width:100%;max-height:260px;object-fit:contain;border-radius:8px;margin:8px 0}
+.plant-marked{display:none;width:100%;max-height:420px;object-fit:contain;background:#000;border-radius:8px;margin:10px 0}
+.plant-report{white-space:pre-wrap;overflow-wrap:anywhere;background:#14243a;border:1px solid #29415e;padding:11px;border-radius:8px;margin-top:8px;min-height:40px}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
@@ -236,6 +245,21 @@ This is not a complete ISL translator.
 <div class="feature-actions"><button class="btn" onclick="askStudyMode()">ASK JARVESH</button><button class="btn red" onclick="hideFeaturePanels()">CLOSE</button></div>
 </div>
 
+
+<div class="plant-panel" id="plantPanel">
+<h3>JARVESH PLANT DOCTOR</h3>
+<p class="muted">Plant photo upload karein. Scanner visible yellow/brown areas ko mark karke observation report banayega.</p>
+<input type="file" id="plantFile" accept="image/*" capture="environment" onchange="previewPlantImage()">
+<img id="plantPreview" class="plant-preview" alt="Plant photo preview">
+<div class="feature-actions">
+<button class="btn green" onclick="scanPlant()">SCAN PLANT</button>
+<button class="btn" onclick="speakPlantReport()">READ REPORT</button>
+<button class="btn red" onclick="closePlantDoctor()">CLOSE</button>
+</div>
+<img id="plantMarked" class="plant-marked" alt="Plant scan with marked areas">
+<div class="plant-report" id="plantReport">Choose a plant image and press SCAN PLANT.</div>
+</div>
+
 <div class="avatar-panel" id="avatarPanel">
 <h3 style="color:#36b7ff">JARVESH 3D-STYLE AI AVATAR</h3>
 <div class="avatar-face"><div class="avatar-eyes"><span></span><span></span></div><div class="avatar-mouth"></div></div>
@@ -299,7 +323,9 @@ const cmds=[
 ['3D AVATAR','avatar'],
 ['WEB SEARCH','search latest AI news'],
 ['COLOUR DETECTOR','colour detect'],
-['STOP COLOUR AI','stop colour detection']
+['STOP COLOUR AI','stop color detection'],
+['PLANT DOCTOR','plant doctor'],
+['PLANT SCAN','plant scan']
 ];
 
 cmds.forEach(([label,cmd])=>{
@@ -734,9 +760,58 @@ if(signText.trim())say(signText);
 else say('there is no text yet');
 }
 
+
+// PLANT DOCTOR - PHOTO UPLOAD SCAN
+function openPlantDoctor(){
+  hideFeaturePanels();
+  document.getElementById('plantPanel').style.display='block';
+  document.getElementById('plantReport').textContent='Choose a plant image and press SCAN PLANT.';
+  add('jarvesh','Plant Doctor ready. Upload or take a plant photo, then press Scan Plant.');
+}
+function closePlantDoctor(){
+  document.getElementById('plantPanel').style.display='none';
+}
+function previewPlantImage(){
+  const file=document.getElementById('plantFile').files[0];
+  const preview=document.getElementById('plantPreview');
+  const marked=document.getElementById('plantMarked');
+  if(!file){preview.style.display='none';return;}
+  if(!file.type.startsWith('image/')){document.getElementById('plantReport').textContent='Please select an image file.';return;}
+  preview.src=URL.createObjectURL(file);
+  preview.style.display='block';
+  marked.style.display='none';
+  document.getElementById('plantReport').textContent='Photo selected. Press SCAN PLANT.';
+}
+async function scanPlant(){
+  const file=document.getElementById('plantFile').files[0];
+  const report=document.getElementById('plantReport');
+  const marked=document.getElementById('plantMarked');
+  if(!file){report.textContent='Please upload or take a plant photo first.';return;}
+  report.textContent='Scanning image... please wait.';
+  marked.style.display='none';
+  try{
+    const formData=new FormData();
+    formData.append('image',file);
+    const response=await fetch('/api/plant-scan',{method:'POST',body:formData});
+    const data=await response.json();
+    if(!response.ok)throw new Error(data.detail||'Plant scan failed');
+    report.textContent=data.report||'Scan completed, but no report was returned.';
+    if(data.marked_image){marked.src=data.marked_image;marked.style.display='block';}
+    add('jarvesh','Plant scan completed. Review the visual observations and care suggestions.');
+  }catch(error){
+    console.error(error);
+    report.textContent='Plant scan could not be completed. Check that the backend endpoint /api/plant-scan is available and try again.';
+  }
+}
+function speakPlantReport(){
+  const report=document.getElementById('plantReport').textContent.trim();
+  if(report&&report!=='Choose a plant image and press SCAN PLANT.')say(report);
+  else say('Please scan a plant image first.');
+}
+
 // NEW FEATURES - COMMAND ACTIVATED ONLY
 function hideFeaturePanels(){
-['objectPanel','imagePanel','studyPanel','avatarPanel'].forEach(id=>{
+['objectPanel','imagePanel','studyPanel','avatarPanel','plantPanel'].forEach(id=>{
 document.getElementById(id).style.display='none';
 });
 }
@@ -1108,6 +1183,12 @@ stopColorDetection();
 return;
 }
 
+
+if(['plant doctor','plant scan','scan plant','plant health','plant scanner'].includes(c)){
+ openPlantDoctor();
+ return;
+}
+
 if(['object detection','start object detection','object ai'].includes(c)){
 await startObjectDetection();
 return;
@@ -1346,6 +1427,10 @@ const commandMap={
 'read image':'image reader',
 'study mode':'study mode',
 'open study mode':'study mode',
+'plant doctor':'plant doctor',
+'plant scan':'plant scan',
+'scan plant':'plant scan',
+'plant health':'plant doctor',
 'avatar':'avatar',
 'show avatar':'avatar'
 };
